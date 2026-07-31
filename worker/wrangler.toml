@@ -3,7 +3,8 @@ main = "src/index.js"
 compatibility_date = "2026-07-31"
 
 [vars]
-ALLOWED_ORIGIN = "https://G041.github.io"
-REPO_OWNER = "G041"
-REPO_NAME = "los-pumas-cafe"
-REPO_BRANCH = "main"
+ALLOWED_ORIGIN = "https://g041.github.io"
+
+[[kv_namespaces]]
+binding = "DB"
+id = "1e68cd75f02c40d2b3ea1f83a6b9e975"

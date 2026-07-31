@@ -1,11 +1,12 @@
 const CSV_HEADER = 'date,C,V,F,T,opening,final,platos,fiscal';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DB_KEY = 'data.csv';
 
 function corsHeaders(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Password',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -15,6 +16,11 @@ function json(env, status, body) {
     status,
     headers: { 'Content-Type': 'application/json', ...corsHeaders(env) },
   });
+}
+
+function checkPassword(request, env) {
+  const pw = request.headers.get('X-App-Password') || '';
+  return pw === env.WRITE_PASSWORD;
 }
 
 function isPositiveNumber(n) {
@@ -49,28 +55,19 @@ function serializeCSV(rows) {
   return [CSV_HEADER, ...lines].join('\n') + '\n';
 }
 
-function b64EncodeUtf8(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function b64DecodeUtf8(b64) {
-  return decodeURIComponent(escape(atob(b64.replace(/\n/g, ''))));
-}
-
-async function githubRequest(env, path, options = {}) {
-  const url = `https://api.github.com/repos/${env.REPO_OWNER}/${env.REPO_NAME}${path}`;
-  return fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${env.GITHUB_PAT}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'User-Agent': 'los-pumas-worker',
-      ...(options.headers || {}),
-    },
-  });
+async function handleGetData(request, env) {
+  if (!checkPassword(request, env)) {
+    return json(env, 401, { ok: false, error: 'bad_password' });
+  }
+  const csv = (await env.DB.get(DB_KEY)) ?? (CSV_HEADER + '\n');
+  return json(env, 200, { ok: true, csv });
 }
 
 async function handleSave(request, env) {
+  if (!checkPassword(request, env)) {
+    return json(env, 401, { ok: false, error: 'bad_password' });
+  }
+
   let body;
   try {
     body = await request.json();
@@ -78,23 +75,12 @@ async function handleSave(request, env) {
     return json(env, 400, { ok: false, error: 'bad_json' });
   }
 
-  if (typeof body.password !== 'string' || body.password !== env.WRITE_PASSWORD) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
-
   if (!validateRecord(body.record)) {
     return json(env, 400, { ok: false, error: 'invalid_record' });
   }
   const r = body.record;
 
-  const getRes = await githubRequest(env, `/contents/data.csv?ref=${env.REPO_BRANCH}`);
-  if (!getRes.ok) {
-    return json(env, 502, { ok: false, error: 'github_get_failed', detail: await getRes.text() });
-  }
-  const getData = await getRes.json();
-  const currentCsv = b64DecodeUtf8(getData.content);
-  const sha = getData.sha;
-
+  const currentCsv = (await env.DB.get(DB_KEY)) ?? (CSV_HEADER + '\n');
   let rows = parseCSV(currentCsv);
   rows = rows.filter((row) => row.date !== r.dateISO);
   rows.push({
@@ -108,19 +94,7 @@ async function handleSave(request, env) {
   rows.sort((a, b) => a.date.localeCompare(b.date));
   const newCsv = serializeCSV(rows);
 
-  const putRes = await githubRequest(env, '/contents/data.csv', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: `Cierre ${r.dateISO}`,
-      content: b64EncodeUtf8(newCsv),
-      sha,
-      branch: env.REPO_BRANCH,
-    }),
-  });
-  if (!putRes.ok) {
-    return json(env, 502, { ok: false, error: 'github_put_failed', detail: await putRes.text() });
-  }
+  await env.DB.put(DB_KEY, newCsv);
 
   return json(env, 200, { ok: true });
 }
@@ -133,11 +107,15 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
 
+    if (url.pathname === '/api/data' && request.method === 'GET') {
+      return handleGetData(request, env);
+    }
+
     if (url.pathname === '/api/save' && request.method === 'POST') {
       return handleSave(request, env);
     }
 
-    if (url.pathname !== '/api/save') {
+    if (url.pathname !== '/api/data' && url.pathname !== '/api/save') {
       return json(env, 404, { ok: false, error: 'not_found' });
     }
 

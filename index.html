@@ -191,6 +191,7 @@
     color: var(--text);
   }
   .retry-btn { margin-top: 14px; }
+  .gate-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 14px; text-align: center; }
 </style>
 </head>
 <body>
@@ -228,13 +229,23 @@
 </div>
 
 <script>
-const RAW_CSV_URL = 'https://raw.githubusercontent.com/G041/los-pumas-cafe/main/data.csv';
-const WORKER_URL = 'REPLACE_WITH_WORKER_URL/api/save';
+const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
 
-async function loadDB() {
-  const res = await fetch(RAW_CSV_URL + '?_=' + Date.now(), { cache: 'no-store' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return parseCSV(await res.text());
+let appPassword = '';
+let authStatus = 'gate'; // 'gate' | 'checking' | 'ready'
+let authError = '';
+
+async function fetchData() {
+  const res = await fetch(WORKER_BASE + '/api/data', {
+    headers: { 'X-App-Password': appPassword },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.error || ('HTTP ' + res.status));
+    err.code = data.error;
+    throw err;
+  }
+  return parseCSV(data.csv);
 }
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -271,8 +282,6 @@ function prevIsoDate(iso) {
 function isFirstOfMonth(iso) { return Number(iso.split('-')[2]) === 1; }
 
 let db = [];
-let dbStatus = 'loading'; // 'loading' | 'ready' | 'error'
-let dbError = '';
 
 const STEPS = ['C', 'V', 'F', 'T', 'opening', 'platos', 'fiscal'];
 const META = {
@@ -296,7 +305,6 @@ function freshState() {
     error: '',
     saved: false,
     saving: false,
-    password: '',
   };
 }
 state = freshState();
@@ -429,7 +437,6 @@ function renderApp() {
   card.className = 'card';
   card.innerHTML = `
     <table class="ledger">${buildRows()}</table>
-    ${isFinalStep ? `<input type="password" id="pwInput" class="pw-input" placeholder="Contraseña" value="${state.password || ''}">` : ''}
     <div class="error">${state.error || ''}</div>
     <div class="controls">
       <button class="secondary" id="backBtn" ${state.activeIndex === 0 || state.saving ? 'disabled' : ''}>← Atrás</button>
@@ -447,11 +454,6 @@ function renderApp() {
   };
 
   card.querySelector('#confirmBtn').onclick = onConfirm;
-
-  const pwInput = card.querySelector('#pwInput');
-  if (pwInput) {
-    pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') onConfirm(); });
-  }
 
   const input = card.querySelector('#stepInput');
   if (input) {
@@ -513,17 +515,6 @@ function errorMessage(code) {
 }
 
 async function trySave() {
-  const card = appEl.querySelector('.card');
-  const pwInput = card.querySelector('#pwInput');
-  const password = pwInput ? pwInput.value : '';
-  state.password = password;
-
-  if (!password) {
-    state.error = 'Ingresá la contraseña.';
-    renderAll();
-    return;
-  }
-
   const record = {
     dateISO: state.dateISO,
     C: state.values.C, V: state.values.V, F: state.values.F, T: state.values.T,
@@ -538,10 +529,10 @@ async function trySave() {
   renderAll();
 
   try {
-    const res = await fetch(WORKER_URL, {
+    const res = await fetch(WORKER_BASE + '/api/save', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password, record }),
+      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      body: JSON.stringify({ record }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
@@ -611,22 +602,23 @@ function fitToViewport() {
 }
 
 function renderAll() {
-  if (dbStatus === 'loading') {
+  if (authStatus !== 'ready') {
     dateBarEl.innerHTML = '';
     stepperEl.innerHTML = '';
-    appEl.innerHTML = `<div class="card"><div class="success" style="color:var(--muted)">Cargando datos, Fabian…</div></div>`;
-    requestAnimationFrame(fitToViewport);
-    return;
-  }
-  if (dbStatus === 'error') {
-    dateBarEl.innerHTML = '';
-    stepperEl.innerHTML = '';
+    const checking = authStatus === 'checking';
     appEl.innerHTML = `
       <div class="card">
-        <div class="error" style="margin-top:0;">No se pudo conectar con la base de datos, Fabian.<br>${dbError || ''}</div>
-        <button class="retry-btn" id="retryBtn">Reintentar</button>
+        <div class="gate-title">Fabian, ingresá la contraseña</div>
+        <input type="password" id="gatePwInput" class="pw-input" placeholder="Contraseña" ${checking ? 'disabled' : ''}>
+        <div class="error">${authError || ''}</div>
+        <button id="gateBtn" ${checking ? 'disabled' : ''}>${checking ? 'Verificando…' : 'Entrar'}</button>
       </div>`;
-    appEl.querySelector('#retryBtn').onclick = init;
+    const gateInput = appEl.querySelector('#gatePwInput');
+    const gateBtn = appEl.querySelector('#gateBtn');
+    const submit = () => { if (!gateInput.value) return; submitPassword(gateInput.value); };
+    gateBtn.onclick = submit;
+    gateInput.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    if (!checking) gateInput.focus();
     requestAnimationFrame(fitToViewport);
     return;
   }
@@ -638,22 +630,24 @@ function renderAll() {
 
 window.addEventListener('resize', fitToViewport);
 
-async function init() {
-  dbStatus = 'loading';
-  dbError = '';
+async function submitPassword(pw) {
+  appPassword = pw;
+  authStatus = 'checking';
+  authError = '';
   renderAll();
   try {
-    db = await loadDB();
-    dbStatus = 'ready';
+    db = await fetchData();
+    authStatus = 'ready';
   } catch (e) {
-    dbStatus = 'error';
-    dbError = e.message || '';
+    authStatus = 'gate';
+    authError = e.code === 'bad_password' ? 'Contraseña incorrecta.' : 'No se pudo conectar. Intentá de nuevo.';
+    appPassword = '';
   }
   renderAll();
-  renderHistory();
+  if (authStatus === 'ready') renderHistory();
 }
 
-init();
+renderAll();
 </script>
 </body>
 </html>
