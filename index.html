@@ -12,8 +12,8 @@
     --card-border: #2a2e38;
     --text: #eef0f3;
     --muted: #9aa1ad;
-    --accent: #4f8cff;
-    --accent-text: #ffffff;
+    --accent: #3EB3EE;
+    --accent-text: #0f1115;
     --ok: #3ecf8e;
     --danger: #ff6b6b;
     --locked: #4a505c;
@@ -26,7 +26,7 @@
   }
   input[type=number] { -moz-appearance: textfield; appearance: textfield; }
   html, body { height: 100%; margin: 0; overflow: hidden; }
-  html { font-size: 19px; }
+  html { font-size: 21px; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background:
@@ -47,6 +47,7 @@
     max-width: 560px;
     transform-origin: center center;
   }
+  #fitWrap.wide { max-width: 760px; }
 
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
@@ -160,37 +161,6 @@
   .note { background: #1c2230; border: 1px solid #2c3550; color: #a9c0ff; font-size: 0.9rem; padding: 10px 12px; border-radius: 10px; margin-top: 10px; }
   .success { color: var(--ok); font-weight: 700; text-align: center; font-size: 1.25rem; margin-bottom: 14px; }
 
-  /* historial widget lateral */
-  #historyBackdrop {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.55);
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.2s ease;
-    z-index: 40;
-  }
-  #historyBackdrop.open { opacity: 1; pointer-events: auto; }
-  #historyPanel {
-    position: fixed; top: 0; right: 0;
-    height: 100%;
-    width: min(380px, 88vw);
-    background: var(--card);
-    border-left: 1px solid var(--card-border);
-    box-shadow: -10px 0 30px rgba(0,0,0,0.45);
-    transform: translateX(100%);
-    transition: transform 0.25s ease;
-    z-index: 50;
-    padding: 18px;
-    overflow-y: auto;
-  }
-  #historyPanel.open { transform: translateX(0); }
-  .history-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .history-title h2 { font-size: 1.1rem; margin: 0; }
-  .history-close { flex: none; width: auto; padding: 6px 10px; background: transparent; border: 1px solid var(--card-border); color: var(--text); font-size: 1rem; }
-  table.history { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.68rem; }
-  table.history th, table.history td { text-align: right; padding: 5px 3px; border-bottom: 1px solid var(--card-border); white-space: normal; word-break: break-word; }
-  table.history th:first-child, table.history td:first-child { text-align: left; }
-  .history-wrap { overflow-x: hidden; }
-
   .pw-input {
     width: 100%;
     margin-top: 14px;
@@ -219,7 +189,7 @@
     cursor: pointer;
   }
   .month-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  .billing-table-wrap { max-height: 42vh; overflow-y: auto; overflow-x: hidden; margin: 4px 0 12px; }
+  .billing-table-wrap { max-height: 58vh; overflow-y: auto; overflow-x: hidden; margin: 4px 0 12px; }
   table.billing {
     table-layout: fixed;
     width: 100%;
@@ -230,8 +200,8 @@
     border-bottom: 1px solid var(--card-border);
     white-space: normal;
     word-break: break-word;
-    font-size: 0.68rem;
-    padding: 5px 3px;
+    font-size: 0.78rem;
+    padding: 6px 5px;
   }
   table.billing th:first-child, table.billing td:first-child { text-align: left; }
   tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); color: var(--ok); }
@@ -245,35 +215,12 @@
         <h1>Los Pumas Cafe</h1>
         <div class="subtitle">Cierre diario de Fabian</div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="history-toggle" id="menuBtn">☰ Menú</button>
-        <button class="history-toggle" id="historyToggleBtn">Mostrar historial</button>
-      </div>
+      <button class="history-toggle" id="menuBtn">☰ Menú</button>
     </div>
 
     <div id="dateBar" class="date-bar"></div>
     <div id="stepper" class="stepper"></div>
     <div id="app"></div>
-  </div>
-</div>
-
-<div id="historyBackdrop"></div>
-<div id="historyPanel">
-  <div class="history-title">
-    <h2>Historial</h2>
-    <button class="history-close" id="historyCloseBtn">Cerrar ✕</button>
-  </div>
-  <div style="margin-bottom:12px;">
-    <button class="link-btn" id="downloadBtn">Descargar CSV</button>
-    <button class="link-btn" id="downloadXlsxBtn">Descargar XLSX</button>
-  </div>
-  <div class="history-wrap">
-    <table class="history" id="historyTable">
-      <thead>
-        <tr><th>Fecha</th><th>C</th><th>V</th><th>F</th><th>T</th><th>Apertura</th><th>Final</th><th>Platos</th><th>Fiscal</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
   </div>
 </div>
 
@@ -377,8 +324,6 @@ const dateBarEl = document.getElementById('dateBar');
 const stepperEl = document.getElementById('stepper');
 const appEl = document.getElementById('app');
 const fitWrapEl = document.getElementById('fitWrap');
-const historyPanelEl = document.getElementById('historyPanel');
-const historyBackdropEl = document.getElementById('historyBackdrop');
 
 function s3() { return (state.values.C||0) + (state.values.V||0) + (state.values.F||0); }
 function s4() { return s3() + (state.values.T||0); }
@@ -539,6 +484,7 @@ function renderFacturacionView() {
       </div>
       <div class="controls">
         <button class="secondary" id="backToMenuBtn">← Volver al menú</button>
+        <button class="secondary" id="downloadCsvBtn">Descargar CSV</button>
         <button class="secondary" id="downloadXlsxBtn2">Descargar XLSX</button>
       </div>
     </div>`;
@@ -547,6 +493,7 @@ function renderFacturacionView() {
     el.onclick = () => { facturacionMonth = el.dataset.ym; renderAll(); };
   });
   appEl.querySelector('#backToMenuBtn').onclick = () => { view = 'menu'; renderAll(); };
+  appEl.querySelector('#downloadCsvBtn').onclick = downloadCSV;
   appEl.querySelector('#downloadXlsxBtn2').onclick = downloadXLSX;
 }
 
@@ -687,7 +634,6 @@ async function trySave() {
     state.saving = false;
     state.saved = true;
     renderAll();
-    renderHistory();
     clearTimeout(autoAdvanceTimer);
     autoAdvanceTimer = setTimeout(() => {
       view = 'facturacion';
@@ -699,16 +645,6 @@ async function trySave() {
     state.error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
     renderAll();
   }
-}
-
-function renderHistory() {
-  const tbody = document.querySelector('#historyTable tbody');
-  tbody.innerHTML = '';
-  [...db].sort((a, b) => b.dateISO.localeCompare(a.dateISO)).forEach(r => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${toDisplayDate(r.dateISO)}</td><td>${fmt(r.C)}</td><td>${fmt(r.V)}</td><td>${fmt(r.F)}</td><td>${fmt(r.T)}</td><td>${fmt(r.opening)}</td><td>${fmt(r.final)}</td><td>${r.platos}</td><td>${fmt(r.fiscal)}</td>`;
-    tbody.appendChild(tr);
-  });
 }
 
 function downloadXLSX() {
@@ -736,9 +672,8 @@ function downloadXLSX() {
 
   XLSX.writeFile(wb, 'los_pumas_cafe.xlsx');
 }
-document.getElementById('downloadXlsxBtn').onclick = downloadXLSX;
 
-document.getElementById('downloadBtn').onclick = () => {
+function downloadCSV() {
   const header = 'date,C,V,F,T,opening,final,platos,fiscal';
   const lines = [...db].sort((a, b) => a.dateISO.localeCompare(b.dateISO)).map(r =>
     [toDisplayDate(r.dateISO), r.C, r.V, r.F, r.T, r.opening, r.final, r.platos, r.fiscal].join(',')
@@ -751,19 +686,7 @@ document.getElementById('downloadBtn').onclick = () => {
   a.download = 'los_pumas_cafe_db.csv';
   a.click();
   URL.revokeObjectURL(url);
-};
-
-function openHistory() {
-  historyPanelEl.classList.add('open');
-  historyBackdropEl.classList.add('open');
 }
-function closeHistory() {
-  historyPanelEl.classList.remove('open');
-  historyBackdropEl.classList.remove('open');
-}
-document.getElementById('historyToggleBtn').onclick = openHistory;
-document.getElementById('historyCloseBtn').onclick = closeHistory;
-historyBackdropEl.onclick = closeHistory;
 
 function fitToViewport() {
   fitWrapEl.style.transform = 'scale(1)';
@@ -795,6 +718,7 @@ function renderAll() {
     requestAnimationFrame(fitToViewport);
     return;
   }
+  fitWrapEl.classList.toggle('wide', view === 'facturacion');
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
@@ -828,7 +752,6 @@ async function submitPassword(pw) {
     appPassword = '';
   }
   renderAll();
-  if (authStatus === 'ready') renderHistory();
 }
 
 renderAll();
