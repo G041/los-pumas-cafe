@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Los Pumas Cafe — Cierre diario</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
   :root {
     --bg: #0f1115;
@@ -215,7 +216,21 @@
     cursor: pointer;
   }
   .month-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  .billing-table-wrap { max-height: 42vh; overflow: auto; margin: 4px 0 12px; }
+  .billing-table-wrap { max-height: 42vh; overflow-y: auto; overflow-x: hidden; margin: 4px 0 12px; }
+  table.billing {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+  table.billing th, table.billing td {
+    text-align: right;
+    border-bottom: 1px solid var(--card-border);
+    white-space: normal;
+    word-break: break-word;
+    font-size: 0.68rem;
+    padding: 5px 3px;
+  }
+  table.billing th:first-child, table.billing td:first-child { text-align: left; }
   tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); color: var(--ok); }
 </style>
 </head>
@@ -245,7 +260,10 @@
     <h2>Historial</h2>
     <button class="history-close" id="historyCloseBtn">Cerrar ✕</button>
   </div>
-  <button class="link-btn" id="downloadBtn" style="margin-bottom:12px;">Descargar CSV</button>
+  <div style="margin-bottom:12px;">
+    <button class="link-btn" id="downloadBtn">Descargar CSV</button>
+    <button class="link-btn" id="downloadXlsxBtn">Descargar XLSX</button>
+  </div>
   <div class="history-wrap">
     <table class="history" id="historyTable">
       <thead>
@@ -504,7 +522,7 @@ function renderFacturacionView() {
       <div class="gate-title">Facturación de Los Pumas Cafe</div>
       <div class="stepper">${tabsHtml}</div>
       <div class="billing-table-wrap">
-        <table class="history">
+        <table class="billing">
           <thead><tr><th>Fecha</th><th>C</th><th>V</th><th>F</th><th>T</th><th>Apertura</th><th>Final</th><th>Platos</th><th>Fiscal</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot>
@@ -518,6 +536,7 @@ function renderFacturacionView() {
       </div>
       <div class="controls">
         <button class="secondary" id="backToMenuBtn">← Volver al menú</button>
+        <button class="secondary" id="downloadXlsxBtn2">Descargar XLSX</button>
       </div>
     </div>`;
 
@@ -525,18 +544,20 @@ function renderFacturacionView() {
     el.onclick = () => { facturacionMonth = el.dataset.ym; renderAll(); };
   });
   appEl.querySelector('#backToMenuBtn').onclick = () => { view = 'menu'; renderAll(); };
+  appEl.querySelector('#downloadXlsxBtn2').onclick = downloadXLSX;
 }
 
 function renderApp() {
   if (state.saved) {
     appEl.innerHTML = `
       <div class="card">
-        <div class="success">Día guardado, Fabian.</div>
+        <div class="success">La información fue guardada correctamente, Fabian.</div>
+        <div style="text-align:center; color:var(--muted); font-size:0.85rem; margin:-10px 0 14px;">Abriendo facturación en unos segundos…</div>
         <button id="newDayBtn">Cargar otro día</button>
         <button class="secondary" id="menuFromSavedBtn" style="margin-top:10px;">Volver al menú</button>
       </div>`;
-    document.getElementById('newDayBtn').onclick = () => { state = freshState(); renderAll(); };
-    document.getElementById('menuFromSavedBtn').onclick = () => { view = 'menu'; renderAll(); };
+    document.getElementById('newDayBtn').onclick = () => { clearTimeout(autoAdvanceTimer); state = freshState(); renderAll(); };
+    document.getElementById('menuFromSavedBtn').onclick = () => { clearTimeout(autoAdvanceTimer); view = 'menu'; renderAll(); };
     return;
   }
 
@@ -622,7 +643,15 @@ function errorMessage(code) {
   }
 }
 
+let autoAdvanceTimer = null;
+
 async function trySave() {
+  const existing = db.find(r => r.dateISO === state.dateISO);
+  if (existing) {
+    const ok = confirm(`Fabian, ya existe un cierre guardado para el ${toDisplayDate(state.dateISO)}. ¿Querés sobreescribirlo?`);
+    if (!ok) return;
+  }
+
   const record = {
     dateISO: state.dateISO,
     C: state.values.C, V: state.values.V, F: state.values.F, T: state.values.T,
@@ -656,6 +685,12 @@ async function trySave() {
     state.saved = true;
     renderAll();
     renderHistory();
+    clearTimeout(autoAdvanceTimer);
+    autoAdvanceTimer = setTimeout(() => {
+      view = 'facturacion';
+      facturacionMonth = record.dateISO.slice(0, 7);
+      renderAll();
+    }, 3000);
   } catch (e) {
     state.saving = false;
     state.error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
@@ -672,6 +707,33 @@ function renderHistory() {
     tbody.appendChild(tr);
   });
 }
+
+function downloadXLSX() {
+  const grouped = groupByMonth();
+  const monthKeys = Object.keys(grouped).sort();
+  const header = ['Fecha', 'C', 'V', 'F', 'T', 'Apertura', 'Final', 'Platos', 'Fiscal'];
+  const wb = XLSX.utils.book_new();
+
+  monthKeys.forEach(ym => {
+    const rows = grouped[ym].slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+    const aoa = [header];
+    rows.forEach(r => aoa.push([toDisplayDate(r.dateISO), r.C, r.V, r.F, r.T, r.opening, r.final, r.platos, r.fiscal]));
+    const totalF = rows.reduce((acc, r) => acc + r.F, 0);
+    const totalT = rows.reduce((acc, r) => acc + r.T, 0);
+    const totalFinal = rows.reduce((acc, r) => acc + r.final, 0);
+    const totalPlatos = rows.reduce((acc, r) => acc + r.platos, 0);
+    aoa.push(['TOTAL', '', '', totalF, totalT, '', totalFinal, totalPlatos, '']);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, monthLabel(ym).slice(0, 31));
+  });
+
+  if (monthKeys.length === 0) {
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header]), 'Sin datos');
+  }
+
+  XLSX.writeFile(wb, 'los_pumas_cafe.xlsx');
+}
+document.getElementById('downloadXlsxBtn').onclick = downloadXLSX;
 
 document.getElementById('downloadBtn').onclick = () => {
   const header = 'date,C,V,F,T,opening,final,platos,fiscal';
