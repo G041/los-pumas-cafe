@@ -73,8 +73,15 @@
     font-size: 1.05rem;
   }
   .date-bar strong { font-size: 1.15rem; }
-  .date-edit { display: flex; gap: 8px; align-items: center; }
-  .date-edit input { font-size: 1rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background: #0c0e12; color: var(--text); }
+  .date-picker-btn {
+    flex: none;
+    width: auto;
+    padding: 8px 14px;
+    font-size: 0.95rem;
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .hidden-date-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
   /* stepper */
   .stepper {
@@ -192,6 +199,24 @@
   }
   .retry-btn { margin-top: 14px; }
   .gate-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 14px; text-align: center; }
+
+  .menu-buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+
+  .month-tab {
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--muted);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .month-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .billing-table-wrap { max-height: 42vh; overflow: auto; margin: 4px 0 12px; }
+  tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); color: var(--ok); }
 </style>
 </head>
 <body>
@@ -202,7 +227,10 @@
         <h1>Los Pumas Cafe</h1>
         <div class="subtitle">Cierre diario de Fabian</div>
       </div>
-      <button class="history-toggle" id="historyToggleBtn">Mostrar historial</button>
+      <div style="display:flex; gap:8px;">
+        <button class="history-toggle" id="menuBtn">☰ Menú</button>
+        <button class="history-toggle" id="historyToggleBtn">Mostrar historial</button>
+      </div>
     </div>
 
     <div id="dateBar" class="date-bar"></div>
@@ -234,6 +262,22 @@ const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
 let appPassword = '';
 let authStatus = 'gate'; // 'gate' | 'checking' | 'ready'
 let authError = '';
+let view = 'menu'; // 'menu' | 'cierre' | 'facturacion'
+let facturacionMonth = null;
+
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function monthLabel(ym) {
+  const [y, m] = ym.split('-');
+  return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
+}
+function groupByMonth() {
+  const map = {};
+  db.forEach(r => {
+    const ym = r.dateISO.slice(0, 7);
+    (map[ym] = map[ym] || []).push(r);
+  });
+  return map;
+}
 
 async function fetchData() {
   const res = await fetch(WORKER_BASE + '/api/data', {
@@ -301,7 +345,6 @@ function freshState() {
     values: { C: null, V: null, F: null, T: null, opening: null, platos: null, fiscal: null },
     openingSource: null,
     activeIndex: 0,
-    editingDate: false,
     error: '',
     saved: false,
     saving: false,
@@ -321,29 +364,24 @@ function s4() { return s3() + (state.values.T||0); }
 function finalResult() { return s4() - (state.values.opening||0); }
 
 function renderDateBar() {
-  if (state.editingDate) {
-    dateBarEl.innerHTML = `
-      <div class="date-edit">
-        <span>Fecha:</span>
-        <input type="date" id="dateInput" value="${state.dateISO}">
-      </div>
-    `;
-    dateBarEl.querySelector('#dateInput').onchange = (e) => {
-      if (!e.target.value) return;
-      state.dateISO = e.target.value;
-      state.editingDate = false;
-      renderAll();
-    };
-  } else {
-    dateBarEl.innerHTML = `
-      <span>Cerrando el día <strong>${toDisplayDate(state.dateISO)}</strong></span>
-      <button class="link-btn" id="changeDateBtn">Cambiar fecha</button>
-    `;
-    dateBarEl.querySelector('#changeDateBtn').onclick = () => {
-      state.editingDate = true;
-      renderAll();
-    };
-  }
+  dateBarEl.innerHTML = `
+    <span>Cerrando el día <strong>${toDisplayDate(state.dateISO)}</strong></span>
+    <button class="date-picker-btn" type="button" id="openDatePicker">📅 Cambiar fecha</button>
+    <input type="date" id="dateInput" class="hidden-date-input" value="${state.dateISO}" tabindex="-1">
+  `;
+  const dateInput = dateBarEl.querySelector('#dateInput');
+  dateBarEl.querySelector('#openDatePicker').onclick = () => {
+    if (dateInput.showPicker) {
+      try { dateInput.showPicker(); return; } catch (e) {}
+    }
+    dateInput.focus();
+    dateInput.click();
+  };
+  dateInput.onchange = (e) => {
+    if (!e.target.value) return;
+    state.dateISO = e.target.value;
+    renderAll();
+  };
 }
 
 function renderStepper() {
@@ -421,14 +459,84 @@ function buildRows() {
   return rows;
 }
 
+function renderMenu() {
+  dateBarEl.innerHTML = '';
+  stepperEl.innerHTML = '';
+  appEl.innerHTML = `
+    <div class="card">
+      <div class="gate-title">¿Qué querés hacer, Fabian?</div>
+      <div class="menu-buttons">
+        <button id="goCierre">Sistema de cierre de caja</button>
+        <button class="secondary" id="goFacturacion">Ver facturación de Los Pumas Cafe</button>
+      </div>
+    </div>`;
+  appEl.querySelector('#goCierre').onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
+  appEl.querySelector('#goFacturacion').onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
+}
+
+function renderFacturacionView() {
+  dateBarEl.innerHTML = '';
+  stepperEl.innerHTML = '';
+
+  const grouped = groupByMonth();
+  const monthKeys = Object.keys(grouped).sort().reverse();
+  if (!facturacionMonth || !grouped[facturacionMonth]) {
+    facturacionMonth = monthKeys[0] || isoToday().slice(0, 7);
+  }
+  const rows = (grouped[facturacionMonth] || []).slice().sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+
+  const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+  const totalF = sum('F'), totalT = sum('T'), totalFinal = sum('final'), totalPlatos = sum('platos');
+
+  const tabsHtml = monthKeys.length
+    ? monthKeys.map(ym => `<div class="month-tab ${ym === facturacionMonth ? 'active' : ''}" data-ym="${ym}">${monthLabel(ym)}</div>`).join('')
+    : '<div class="month-tab">Sin datos todavía</div>';
+
+  const rowsHtml = rows.length ? rows.map(r => `
+    <tr>
+      <td>${toDisplayDate(r.dateISO)}</td>
+      <td>${fmt(r.C)}</td><td>${fmt(r.V)}</td><td>${fmt(r.F)}</td><td>${fmt(r.T)}</td>
+      <td>${fmt(r.opening)}</td><td>${fmt(r.final)}</td><td>${r.platos}</td><td>${fmt(r.fiscal)}</td>
+    </tr>`).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--muted);">Sin entradas este mes</td></tr>`;
+
+  appEl.innerHTML = `
+    <div class="card">
+      <div class="gate-title">Facturación de Los Pumas Cafe</div>
+      <div class="stepper">${tabsHtml}</div>
+      <div class="billing-table-wrap">
+        <table class="history">
+          <thead><tr><th>Fecha</th><th>C</th><th>V</th><th>F</th><th>T</th><th>Apertura</th><th>Final</th><th>Platos</th><th>Fiscal</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+          <tfoot>
+            <tr class="billing-total">
+              <td>TOTAL</td><td>—</td><td>—</td>
+              <td>${fmt(totalF)}</td><td>${fmt(totalT)}</td><td>—</td>
+              <td>${fmt(totalFinal)}</td><td>${totalPlatos}</td><td>—</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="controls">
+        <button class="secondary" id="backToMenuBtn">← Volver al menú</button>
+      </div>
+    </div>`;
+
+  appEl.querySelectorAll('.month-tab[data-ym]').forEach(el => {
+    el.onclick = () => { facturacionMonth = el.dataset.ym; renderAll(); };
+  });
+  appEl.querySelector('#backToMenuBtn').onclick = () => { view = 'menu'; renderAll(); };
+}
+
 function renderApp() {
   if (state.saved) {
     appEl.innerHTML = `
       <div class="card">
         <div class="success">Día guardado, Fabian.</div>
         <button id="newDayBtn">Cargar otro día</button>
+        <button class="secondary" id="menuFromSavedBtn" style="margin-top:10px;">Volver al menú</button>
       </div>`;
     document.getElementById('newDayBtn').onclick = () => { state = freshState(); renderAll(); };
+    document.getElementById('menuFromSavedBtn').onclick = () => { view = 'menu'; renderAll(); };
     return;
   }
 
@@ -611,7 +719,7 @@ function renderAll() {
         <div class="gate-title">Fabian, ingresá la contraseña</div>
         <input type="password" id="gatePwInput" class="pw-input" placeholder="Contraseña" ${checking ? 'disabled' : ''}>
         <div class="error">${authError || ''}</div>
-        <button id="gateBtn" ${checking ? 'disabled' : ''}>${checking ? 'Verificando…' : 'Entrar'}</button>
+        <button id="gateBtn" ${checking ? 'disabled' : ''}>${checking ? 'Verificando…' : 'Acceder al sistema'}</button>
       </div>`;
     const gateInput = appEl.querySelector('#gatePwInput');
     const gateBtn = appEl.querySelector('#gateBtn');
@@ -622,13 +730,20 @@ function renderAll() {
     requestAnimationFrame(fitToViewport);
     return;
   }
-  renderDateBar();
-  renderStepper();
-  renderApp();
+  if (view === 'menu') {
+    renderMenu();
+  } else if (view === 'facturacion') {
+    renderFacturacionView();
+  } else {
+    renderDateBar();
+    renderStepper();
+    renderApp();
+  }
   requestAnimationFrame(fitToViewport);
 }
 
 window.addEventListener('resize', fitToViewport);
+document.getElementById('menuBtn').onclick = () => { view = 'menu'; renderAll(); };
 
 async function submitPassword(pw) {
   appPassword = pw;
