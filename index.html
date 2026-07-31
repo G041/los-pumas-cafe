@@ -234,6 +234,34 @@
   }
   table.billing th:first-child, table.billing td:first-child { text-align: left; }
   tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); padding-top: 16px; color: var(--ok); }
+  tr.plato-row { cursor: pointer; }
+  tr.plato-row:hover td { background: var(--input-bg); }
+
+  .menu-builder-layout { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+  .menu-editor { flex: 1.4 1 260px; }
+  .menu-textarea {
+    width: 100%;
+    min-height: 46vh;
+    resize: vertical;
+    padding: 12px;
+    font-size: 1rem;
+    font-family: inherit;
+    line-height: 1.5;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--text);
+  }
+  .menu-search { flex: 1 1 220px; display: flex; flex-direction: column; gap: 8px; }
+  .plato-search-results { max-height: 40vh; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 10px; }
+  .plato-search-item { padding: 10px 12px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
+  .plato-search-item:last-child { border-bottom: none; }
+  .plato-search-item:hover { background: var(--card); }
+  .plato-search-name { font-weight: 600; }
+  .plato-search-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .plato-search-empty { padding: 14px; text-align: center; color: var(--muted); }
+  .new-plato-row { margin-bottom: 10px; }
+  .new-plato-name { font-weight: 600; margin-bottom: 4px; }
   .theme-toggle { font-size: 1rem; padding: 10px 12px; }
 </style>
 </head>
@@ -310,6 +338,54 @@ function parseCSV(text) {
   });
 }
 function fmt(n) { return Number(n).toLocaleString('es-AR'); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// nombre/categoria are free text and may contain commas, so platos.csv is
+// quoted-CSV — mirrors worker/src/index.js parseCSVLine/csvEscapeField.
+function parseCSVLine(line) {
+  const fields = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"' && line[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      fields.push(field);
+      field = '';
+    } else {
+      field += c;
+    }
+  }
+  fields.push(field);
+  return fields;
+}
+function parsePlatosCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  lines.shift(); // header
+  return lines.map(line => {
+    const [nombre, categoria, ultimaFecha, ultimoPrecio] = parseCSVLine(line);
+    return { nombre, categoria, ultimaFecha, ultimoPrecio: Number(ultimoPrecio) };
+  });
+}
+async function fetchPlatos() {
+  const res = await fetch(WORKER_BASE + '/api/platos', {
+    headers: { 'X-App-Password': appPassword },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.error || ('HTTP ' + res.status));
+    err.code = data.error;
+    throw err;
+  }
+  return parsePlatosCSV(data.csv);
+}
 function toDisplayDate(iso) {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y.slice(2)}`;
@@ -327,6 +403,129 @@ function prevIsoDate(iso) {
 function isFirstOfMonth(iso) { return Number(iso.split('-')[2]) === 1; }
 
 let db = [];
+let platosDb = [];
+let platoForm = null;
+const PLATO_CATEGORIAS = ['Carne', 'Pollo', 'Cerdo', 'Pescado', 'Pasta', 'Arroz', 'Ensalada', 'Guarnición', 'Postre', 'Bebida'];
+function freshPlatoForm() {
+  return { nombre: '', categoria: '', ultimoPrecio: '', editingNombre: null, error: '', saving: false };
+}
+
+let menuBuilderState = null;
+function freshMenuBuilderState() {
+  return { text: '', search: '', confirmingNew: null, pendingUpdates: null, error: '', saving: false, success: false };
+}
+function normalizeName(s) {
+  return String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function findPlatoByName(nombre) {
+  const norm = normalizeName(nombre);
+  return platosDb.find(p => normalizeName(p.nombre) === norm);
+}
+// Lines look like "nombre plato $ precio" - split on the LAST '$' so dish
+// names are free to contain anything except the literal separator.
+function parseMenuLines(text) {
+  const parsed = [];
+  text.split(/\r?\n/).forEach(raw => {
+    const line = raw.trim();
+    if (!line) return;
+    const sepIdx = line.lastIndexOf('$');
+    if (sepIdx === -1) return;
+    const nombre = line.slice(0, sepIdx).trim();
+    const precio = Number(line.slice(sepIdx + 1).trim().replace(/[^\d.]/g, ''));
+    if (!nombre || !precio || isNaN(precio) || precio <= 0) return;
+    parsed.push({ nombre, precio });
+  });
+  return parsed;
+}
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+// KV holds the whole platos catalog under one key, so concurrent writes would
+// clobber each other's read-modify-write - these MUST run sequentially.
+async function executeMenuSave(updates) {
+  menuBuilderState.saving = true;
+  menuBuilderState.error = '';
+  renderAll();
+
+  try {
+    for (const plato of updates) {
+      const res = await fetch(WORKER_BASE + '/api/platos/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+        body: JSON.stringify({ plato }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw Object.assign(new Error(data.error || 'save_failed'), { code: data.error });
+      }
+      platosDb = platosDb.filter(p => p.nombre !== plato.nombre);
+      platosDb.push(plato);
+    }
+    const copied = await copyToClipboard(menuBuilderState.text);
+    menuBuilderState.saving = false;
+    menuBuilderState.confirmingNew = null;
+    menuBuilderState.pendingUpdates = null;
+    menuBuilderState.success = copied ? 'copied' : 'saved_no_copy';
+    renderAll();
+    setTimeout(() => { menuBuilderState.success = false; renderAll(); }, 4000);
+  } catch (e) {
+    menuBuilderState.saving = false;
+    menuBuilderState.error = errorMessage(e.code);
+    renderAll();
+  }
+}
+function onCopiarMenuClick() {
+  const parsedLines = parseMenuLines(menuBuilderState.text);
+  const updates = [];
+  const newOnes = [];
+  const seen = new Set();
+
+  parsedLines.forEach(pl => {
+    const existing = findPlatoByName(pl.nombre);
+    if (existing) {
+      if (Number(existing.ultimoPrecio) !== pl.precio) {
+        updates.push({ nombre: existing.nombre, categoria: existing.categoria, ultimaFecha: isoToday(), ultimoPrecio: pl.precio });
+      }
+    } else {
+      const key = normalizeName(pl.nombre);
+      if (!seen.has(key)) {
+        seen.add(key);
+        newOnes.push({ nombre: pl.nombre, precio: pl.precio, categoria: '' });
+      }
+    }
+  });
+
+  if (!parsedLines.length) {
+    menuBuilderState.error = 'El menú está vacío. Escribí al menos un plato con su precio.';
+    renderAll();
+    return;
+  }
+
+  if (newOnes.length) {
+    menuBuilderState.confirmingNew = newOnes;
+    menuBuilderState.pendingUpdates = updates;
+    menuBuilderState.error = '';
+    renderAll();
+    return;
+  }
+
+  executeMenuSave(updates);
+}
 
 const STEPS = ['C', 'V', 'F', 'T', 'opening', 'platos', 'fiscal'];
 const META = {
@@ -467,10 +666,230 @@ function renderMenu() {
       <div class="menu-buttons">
         <button id="goCierre">Sistema de cierre de caja</button>
         <button class="secondary" id="goFacturacion">Ver facturación de Los Pumas Cafe</button>
+        <button class="secondary" id="goPlatos">Gestionar platos</button>
+        <button class="secondary" id="goMenuBuilder">Armar menú del día</button>
       </div>
     </div>`;
   appEl.querySelector('#goCierre').onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
   appEl.querySelector('#goFacturacion').onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
+  appEl.querySelector('#goPlatos').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); renderAll(); };
+  appEl.querySelector('#goMenuBuilder').onclick = () => { view = 'menuBuilder'; if (!menuBuilderState) menuBuilderState = freshMenuBuilderState(); renderAll(); };
+}
+
+function renderPlatosView() {
+  dateBarEl.innerHTML = '';
+  stepperEl.innerHTML = '';
+
+  const rows = [...platosDb].sort((a, b) => a.categoria.localeCompare(b.categoria) || a.nombre.localeCompare(b.nombre));
+
+  const rowsHtml = rows.length ? rows.map(p => `
+    <tr class="plato-row" data-nombre="${escapeHtml(p.nombre)}">
+      <td>${escapeHtml(p.nombre)}</td>
+      <td>${escapeHtml(p.categoria)}</td>
+      <td>${toDisplayDate(p.ultimaFecha)}</td>
+      <td>${fmt(p.ultimoPrecio)}</td>
+    </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);">No hay platos cargados</td></tr>`;
+
+  const editing = !!platoForm.editingNombre;
+  const categoriaOptions = PLATO_CATEGORIAS.map(c => `<option value="${escapeHtml(c)}">`).join('');
+
+  appEl.innerHTML = `
+    <div class="card">
+      <div class="gate-title">Platos</div>
+      <div class="billing-table-wrap">
+        <table class="billing">
+          <thead><tr><th>Nombre</th><th>Categoría</th><th>Últ. uso</th><th>Últ. precio</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px; font-weight:700;">${editing ? 'Editar plato' : 'Nuevo plato'}</div>
+      <input id="platoNombre" class="pw-input" placeholder="Nombre del plato (con guarnición)" value="${escapeHtml(platoForm.nombre)}" ${editing ? 'readonly' : ''}>
+      <input id="platoCategoria" class="pw-input" list="platoCategoriaList" placeholder="Categoría (ej. Carne, Pollo, Arroz)" value="${escapeHtml(platoForm.categoria)}">
+      <datalist id="platoCategoriaList">${categoriaOptions}</datalist>
+      <input id="platoPrecio" class="pw-input" type="number" step="any" min="0" placeholder="Último precio" value="${platoForm.ultimoPrecio}">
+      <div class="error">${platoForm.error || ''}</div>
+      <div class="controls">
+        ${editing ? '<button class="secondary" id="cancelPlatoBtn">Cancelar</button>' : ''}
+        <button id="savePlatoBtn" ${platoForm.saving ? 'disabled' : ''}>${platoForm.saving ? 'Guardando…' : (editing ? 'Guardar cambios' : 'Agregar plato')}</button>
+      </div>
+      <div class="controls">
+        <button class="secondary" id="backToMenuFromPlatosBtn">← Volver al menú</button>
+      </div>
+    </div>`;
+
+  appEl.querySelectorAll('.plato-row').forEach(el => {
+    el.onclick = () => {
+      const p = platosDb.find(x => x.nombre === el.dataset.nombre);
+      if (!p) return;
+      platoForm = { nombre: p.nombre, categoria: p.categoria, ultimoPrecio: p.ultimoPrecio, editingNombre: p.nombre, error: '', saving: false };
+      renderAll();
+    };
+  });
+  appEl.querySelector('#platoNombre').oninput = (e) => { platoForm.nombre = e.target.value; };
+  appEl.querySelector('#platoCategoria').oninput = (e) => { platoForm.categoria = e.target.value; };
+  appEl.querySelector('#platoPrecio').oninput = (e) => { platoForm.ultimoPrecio = e.target.value; };
+  appEl.querySelector('#savePlatoBtn').onclick = savePlato;
+  const cancelBtn = appEl.querySelector('#cancelPlatoBtn');
+  if (cancelBtn) cancelBtn.onclick = () => { platoForm = freshPlatoForm(); renderAll(); };
+  appEl.querySelector('#backToMenuFromPlatosBtn').onclick = () => { view = 'menu'; renderAll(); };
+}
+
+function renderMenuBuilderView() {
+  dateBarEl.innerHTML = '';
+  stepperEl.innerHTML = '';
+
+  if (menuBuilderState.confirmingNew) {
+    renderMenuBuilderConfirmView();
+    return;
+  }
+
+  const q = normalizeName(menuBuilderState.search);
+  const results = (q ? platosDb.filter(p => normalizeName(p.nombre).includes(q)) : platosDb)
+    .slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+  const resultsHtml = results.length ? results.map(p => `
+    <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}">
+      <div class="plato-search-name">${escapeHtml(p.nombre)}</div>
+      <div class="plato-search-meta">${escapeHtml(p.categoria)} · Últ. uso ${toDisplayDate(p.ultimaFecha)} · $ ${fmt(p.ultimoPrecio)}</div>
+    </div>`).join('') : `<div class="plato-search-empty">Sin resultados</div>`;
+
+  let successMsg = '';
+  if (menuBuilderState.success === 'copied') successMsg = 'Menú guardado y copiado al portapapeles ✔';
+  else if (menuBuilderState.success === 'saved_no_copy') successMsg = 'Menú guardado, pero no se pudo copiar automáticamente. Copialo manualmente.';
+
+  appEl.innerHTML = `
+    <div class="card">
+      <div class="gate-title">Armado de menú del día</div>
+      <div class="menu-builder-layout">
+        <div class="menu-editor">
+          <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día...">${escapeHtml(menuBuilderState.text)}</textarea>
+        </div>
+        <div class="menu-search">
+          <input id="menuSearchInput" class="pw-input" placeholder="Buscar plato (ej. bife de chorizo)" value="${escapeHtml(menuBuilderState.search)}">
+          <div class="plato-search-results">${resultsHtml}</div>
+        </div>
+      </div>
+      <div class="error">${menuBuilderState.error || ''}</div>
+      ${successMsg ? `<div class="success" style="font-size:1rem;">${successMsg}</div>` : ''}
+      <div class="controls">
+        <button class="secondary" id="backToMenuFromBuilderBtn">← Volver al menú</button>
+        <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
+      </div>
+    </div>`;
+
+  const editor = appEl.querySelector('#menuEditor');
+  editor.oninput = (e) => { menuBuilderState.text = e.target.value; };
+
+  const searchInput = appEl.querySelector('#menuSearchInput');
+  searchInput.oninput = (e) => {
+    menuBuilderState.search = e.target.value;
+    const caret = e.target.selectionStart;
+    renderAll();
+    const newInput = appEl.querySelector('#menuSearchInput');
+    if (newInput) { newInput.focus(); newInput.setSelectionRange(caret, caret); }
+  };
+
+  appEl.querySelectorAll('.plato-search-item').forEach(el => {
+    el.onclick = () => {
+      const p = platosDb.find(x => x.nombre === el.dataset.nombre);
+      if (!p) return;
+      const line = `${p.nombre} $ ${Math.round(p.ultimoPrecio)}`;
+      const current = menuBuilderState.text;
+      menuBuilderState.text = current && !current.endsWith('\n') ? current + '\n' + line + '\n' : current + line + '\n';
+      editor.value = menuBuilderState.text;
+      editor.scrollTop = editor.scrollHeight;
+      editor.focus();
+    };
+  });
+
+  appEl.querySelector('#backToMenuFromBuilderBtn').onclick = () => { view = 'menu'; renderAll(); };
+  appEl.querySelector('#copiarMenuBtn').onclick = onCopiarMenuClick;
+}
+
+function renderMenuBuilderConfirmView() {
+  const items = menuBuilderState.confirmingNew;
+  const rowsHtml = items.map((it, i) => `
+    <div class="new-plato-row">
+      <div class="new-plato-name">${escapeHtml(it.nombre)} — $ ${fmt(it.precio)}</div>
+      <input class="pw-input new-plato-categoria" data-idx="${i}" list="platoCategoriaList" placeholder="Categoría para este plato nuevo" value="${escapeHtml(it.categoria)}">
+    </div>`).join('');
+  const categoriaOptions = PLATO_CATEGORIAS.map(c => `<option value="${escapeHtml(c)}">`).join('');
+
+  appEl.innerHTML = `
+    <div class="card">
+      <div class="gate-title">Platos nuevos detectados</div>
+      <div style="color:var(--muted); margin-bottom:10px;">No encontramos estos platos en la base. Asigná una categoría para darlos de alta junto con el menú de hoy.</div>
+      ${rowsHtml}
+      <datalist id="platoCategoriaList">${categoriaOptions}</datalist>
+      <div class="error">${menuBuilderState.error || ''}</div>
+      <div class="controls">
+        <button class="secondary" id="cancelNewPlatosBtn" ${menuBuilderState.saving ? 'disabled' : ''}>Cancelar</button>
+        <button id="confirmNewPlatosBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Confirmar y copiar menú'}</button>
+      </div>
+    </div>`;
+
+  appEl.querySelectorAll('.new-plato-categoria').forEach(el => {
+    el.oninput = (e) => { menuBuilderState.confirmingNew[Number(e.target.dataset.idx)].categoria = e.target.value; };
+  });
+  appEl.querySelector('#cancelNewPlatosBtn').onclick = () => {
+    menuBuilderState.confirmingNew = null;
+    menuBuilderState.pendingUpdates = null;
+    menuBuilderState.error = '';
+    renderAll();
+  };
+  appEl.querySelector('#confirmNewPlatosBtn').onclick = () => {
+    for (const it of menuBuilderState.confirmingNew) {
+      if (!it.categoria || !it.categoria.trim()) {
+        menuBuilderState.error = 'Asigná una categoría a todos los platos nuevos.';
+        renderAll();
+        return;
+      }
+    }
+    const newUpdates = menuBuilderState.confirmingNew.map(it => ({
+      nombre: it.nombre, categoria: it.categoria.trim(), ultimaFecha: isoToday(), ultimoPrecio: it.precio,
+    }));
+    const allUpdates = [...(menuBuilderState.pendingUpdates || []), ...newUpdates];
+    executeMenuSave(allUpdates);
+  };
+}
+
+async function savePlato() {
+  const nombre = (platoForm.nombre || '').trim();
+  const categoria = (platoForm.categoria || '').trim();
+  const precio = Number(platoForm.ultimoPrecio);
+
+  if (!nombre) { platoForm.error = 'Ingresá el nombre del plato.'; renderAll(); return; }
+  if (!categoria) { platoForm.error = 'Ingresá la categoría.'; renderAll(); return; }
+  if (!platoForm.ultimoPrecio || isNaN(precio) || precio <= 0) { platoForm.error = 'Ingresá un precio válido.'; renderAll(); return; }
+
+  const plato = { nombre, categoria, ultimaFecha: isoToday(), ultimoPrecio: precio };
+
+  platoForm.saving = true;
+  platoForm.error = '';
+  renderAll();
+
+  try {
+    const res = await fetch(WORKER_BASE + '/api/platos/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      body: JSON.stringify({ plato }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      platoForm.saving = false;
+      platoForm.error = errorMessage(data.error);
+      renderAll();
+      return;
+    }
+    platosDb = platosDb.filter(p => p.nombre !== plato.nombre);
+    platosDb.push(plato);
+    platoForm = freshPlatoForm();
+    renderAll();
+  } catch (e) {
+    platoForm.saving = false;
+    platoForm.error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
+    renderAll();
+  }
 }
 
 function renderFacturacionView() {
@@ -627,6 +1046,7 @@ function errorMessage(code) {
   switch (code) {
     case 'bad_password': return 'Contraseña incorrecta.';
     case 'invalid_record': return 'Algún valor no es válido. Revisá los números e intentá de nuevo.';
+    case 'invalid_plato': return 'Algún dato del plato no es válido. Revisá nombre, categoría y precio.';
     default: return 'No se pudo guardar. Revisá tu conexión e intentá de nuevo.';
   }
 }
@@ -756,11 +1176,15 @@ function renderAll() {
     requestAnimationFrame(fitToViewport);
     return;
   }
-  fitWrapEl.classList.toggle('wide', view === 'facturacion');
+  fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos' || view === 'menuBuilder');
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
     renderFacturacionView();
+  } else if (view === 'platos') {
+    renderPlatosView();
+  } else if (view === 'menuBuilder') {
+    renderMenuBuilderView();
   } else {
     renderDateBar();
     renderStepper();
@@ -793,7 +1217,7 @@ async function submitPassword(pw) {
   authError = '';
   renderAll();
   try {
-    db = await fetchData();
+    [db, platosDb] = await Promise.all([fetchData(), fetchPlatos()]);
     authStatus = 'ready';
   } catch (e) {
     authStatus = 'gate';

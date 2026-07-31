@@ -2,6 +2,9 @@ const CSV_HEADER = 'date,C,V,F,T,opening,final,platos,fiscal';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DB_KEY = 'data.csv';
 
+const PLATOS_CSV_HEADER = 'nombre,categoria,ultimaFecha,ultimoPrecio';
+const PLATOS_DB_KEY = 'platos.csv';
+
 function corsHeaders(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN,
@@ -55,6 +58,62 @@ function serializeCSV(rows) {
   return [CSV_HEADER, ...lines].join('\n') + '\n';
 }
 
+// nombre is free text (dish + side) and may contain commas, so plato rows use
+// quoted-CSV instead of the plain split(',') the ledger rows use above.
+function csvEscapeField(value) {
+  const s = String(value);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function parseCSVLine(line) {
+  const fields = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"' && line[i + 1] === '"') { field += '"'; i++; }
+      else if (c === '"') { inQuotes = false; }
+      else { field += c; }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      fields.push(field);
+      field = '';
+    } else {
+      field += c;
+    }
+  }
+  fields.push(field);
+  return fields;
+}
+
+function validatePlato(p) {
+  if (!p || typeof p !== 'object') return false;
+  if (typeof p.nombre !== 'string' || p.nombre.trim().length === 0) return false;
+  if (typeof p.categoria !== 'string' || p.categoria.trim().length === 0) return false;
+  if (typeof p.ultimaFecha !== 'string' || !DATE_RE.test(p.ultimaFecha)) return false;
+  if (!isPositiveNumber(p.ultimoPrecio)) return false;
+  return true;
+}
+
+function parsePlatosCSV(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  lines.shift(); // header
+  return lines.map((line) => {
+    const [nombre, categoria, ultimaFecha, ultimoPrecio] = parseCSVLine(line);
+    return { nombre, categoria, ultimaFecha, ultimoPrecio };
+  });
+}
+
+function serializePlatosCSV(rows) {
+  const lines = rows.map((r) =>
+    [csvEscapeField(r.nombre), csvEscapeField(r.categoria), r.ultimaFecha, r.ultimoPrecio].join(',')
+  );
+  return [PLATOS_CSV_HEADER, ...lines].join('\n') + '\n';
+}
+
 async function handleGetData(request, env) {
   if (!checkPassword(request, env)) {
     return json(env, 401, { ok: false, error: 'bad_password' });
@@ -99,6 +158,43 @@ async function handleSave(request, env) {
   return json(env, 200, { ok: true });
 }
 
+async function handleGetPlatos(request, env) {
+  if (!checkPassword(request, env)) {
+    return json(env, 401, { ok: false, error: 'bad_password' });
+  }
+  const csv = (await env.DB.get(PLATOS_DB_KEY)) ?? (PLATOS_CSV_HEADER + '\n');
+  return json(env, 200, { ok: true, csv });
+}
+
+async function handleSavePlato(request, env) {
+  if (!checkPassword(request, env)) {
+    return json(env, 401, { ok: false, error: 'bad_password' });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return json(env, 400, { ok: false, error: 'bad_json' });
+  }
+
+  if (!validatePlato(body.plato)) {
+    return json(env, 400, { ok: false, error: 'invalid_plato' });
+  }
+  const p = body.plato;
+
+  const currentCsv = (await env.DB.get(PLATOS_DB_KEY)) ?? (PLATOS_CSV_HEADER + '\n');
+  let rows = parsePlatosCSV(currentCsv);
+  rows = rows.filter((row) => row.nombre !== p.nombre);
+  rows.push({ nombre: p.nombre, categoria: p.categoria, ultimaFecha: p.ultimaFecha, ultimoPrecio: p.ultimoPrecio });
+  rows.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const newCsv = serializePlatosCSV(rows);
+
+  await env.DB.put(PLATOS_DB_KEY, newCsv);
+
+  return json(env, 200, { ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -115,7 +211,16 @@ export default {
       return handleSave(request, env);
     }
 
-    if (url.pathname !== '/api/data' && url.pathname !== '/api/save') {
+    if (url.pathname === '/api/platos' && request.method === 'GET') {
+      return handleGetPlatos(request, env);
+    }
+
+    if (url.pathname === '/api/platos/save' && request.method === 'POST') {
+      return handleSavePlato(request, env);
+    }
+
+    const knownPaths = ['/api/data', '/api/save', '/api/platos', '/api/platos/save'];
+    if (!knownPaths.includes(url.pathname)) {
       return json(env, 404, { ok: false, error: 'not_found' });
     }
 
