@@ -5,8 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Los Pumas Cafe — Cierre diario</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('lospumas_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+})();
+</script>
 <style>
   :root {
+    --bg: #f3f5f8;
+    --card: #ffffff;
+    --card-border: #dde1e8;
+    --text: #1b1f27;
+    --muted: #667085;
+    --accent: #3EB3EE;
+    --accent-text: #0f1115;
+    --ok: #1a9d63;
+    --danger: #d94343;
+    --locked: #b7bcc4;
+    --input-bg: #eef1f5;
+    --overlay-top: rgba(255,255,255,0.88);
+    --overlay-bottom: rgba(255,255,255,0.94);
+    --done-bg: #d9f3e5;
+    --done-border: #a7e3c1;
+  }
+  :root[data-theme="dark"] {
     --bg: #0f1115;
     --card: #171a21;
     --card-border: #2a2e38;
@@ -17,6 +42,11 @@
     --ok: #3ecf8e;
     --danger: #ff6b6b;
     --locked: #4a505c;
+    --input-bg: #0c0e12;
+    --overlay-top: rgba(10,11,14,0.88);
+    --overlay-bottom: rgba(10,11,14,0.93);
+    --done-bg: #163d2c;
+    --done-border: #1f5c40;
   }
   * { box-sizing: border-box; }
   input[type=number]::-webkit-inner-spin-button,
@@ -30,7 +60,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background:
-      linear-gradient(rgba(10,11,14,0.88), rgba(10,11,14,0.93)),
+      linear-gradient(var(--overlay-top), var(--overlay-bottom)),
       url('los-pumas-cafe.jpg') center / cover no-repeat fixed;
     color: var(--text);
   }
@@ -106,7 +136,7 @@
     color: var(--muted);
     white-space: nowrap;
   }
-  .step-pill.done { background: #163d2c; border-color: #1f5c40; color: var(--ok); }
+  .step-pill.done { background: var(--done-bg); border-color: var(--done-border); color: var(--ok); }
   .step-pill.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 
   .card {
@@ -135,7 +165,7 @@
     font-size: 1.05rem;
     border-radius: 8px;
     border: 1px solid var(--accent);
-    background: #0c0e12;
+    background: var(--input-bg);
     color: var(--text);
   }
   table.ledger .note-inline { font-size: 0.78rem; color: var(--muted); display: block; margin-top: 3px; font-weight: 400; }
@@ -158,7 +188,6 @@
   button.link-btn { background: none; border: none; color: var(--accent); font-size: 0.95rem; width: auto; padding: 4px; flex: none; }
 
   .error { color: var(--danger); font-size: 0.9rem; margin-top: 8px; }
-  .note { background: #1c2230; border: 1px solid #2c3550; color: #a9c0ff; font-size: 0.9rem; padding: 10px 12px; border-radius: 10px; margin-top: 10px; }
   .success { color: var(--ok); font-weight: 700; text-align: center; font-size: 1.25rem; margin-bottom: 14px; }
 
   .pw-input {
@@ -168,7 +197,7 @@
     font-size: 1rem;
     border-radius: 8px;
     border: 1px solid var(--card-border);
-    background: #0c0e12;
+    background: var(--input-bg);
     color: var(--text);
   }
   .retry-btn { margin-top: 14px; }
@@ -204,7 +233,8 @@
     padding: 6px 5px;
   }
   table.billing th:first-child, table.billing td:first-child { text-align: left; }
-  tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); color: var(--ok); }
+  tr.billing-total td { font-weight: 700; border-top: 2px solid var(--accent); padding-top: 16px; color: var(--ok); }
+  .theme-toggle { font-size: 1rem; padding: 10px 12px; }
 </style>
 </head>
 <body>
@@ -215,7 +245,10 @@
         <h1>Los Pumas Cafe</h1>
         <div class="subtitle">Cierre diario de Fabian</div>
       </div>
-      <button class="history-toggle" id="menuBtn">☰ Menú</button>
+      <div style="display:flex; gap:8px;">
+        <button class="history-toggle theme-toggle" id="themeToggleBtn" type="button">🌙</button>
+        <button class="history-toggle" id="menuBtn">☰ Menú</button>
+      </div>
     </div>
 
     <div id="dateBar" class="date-bar"></div>
@@ -471,6 +504,11 @@ function renderFacturacionView() {
       <div class="stepper">${tabsHtml}</div>
       <div class="billing-table-wrap">
         <table class="billing">
+          <colgroup>
+            <col style="width:10ch"><col style="width:10ch"><col style="width:10ch">
+            <col style="width:10ch"><col style="width:10ch"><col style="width:10ch">
+            <col style="width:10ch"><col style="width:5ch"><col style="width:10ch">
+          </colgroup>
           <thead><tr><th>Fecha</th><th>C</th><th>V</th><th>F</th><th>T</th><th>Apertura</th><th>Final</th><th>Platos</th><th>Fiscal</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
           <tfoot>
@@ -737,6 +775,17 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitToViewport);
 }
 document.getElementById('menuBtn').onclick = () => { view = 'menu'; renderAll(); };
+
+function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'light'; }
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('lospumas_theme', theme); } catch (e) {}
+  document.getElementById('themeToggleBtn').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+applyTheme(currentTheme());
+document.getElementById('themeToggleBtn').onclick = () => {
+  applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+};
 
 async function submitPassword(pw) {
   appPassword = pw;
