@@ -1,5 +1,6 @@
 worker/node_modules/
 worker/.wrangler/
+.wrangler/
 worker/.dev.vars
 nueva-foto.pdf
 cambios.txt

@@ -78,6 +78,7 @@
     transform-origin: center center;
   }
   #fitWrap.wide { max-width: 900px; }
+  #fitWrap.menu-wide { max-width: 1200px; }
 
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
@@ -238,7 +239,7 @@
   tr.plato-row:hover td { background: var(--input-bg); }
 
   .menu-builder-layout { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
-  .menu-editor { flex: 1.4 1 260px; }
+  .menu-editor { flex: 2.2 1 320px; min-width: 320px; }
   .menu-textarea {
     width: 100%;
     min-height: 46vh;
@@ -252,7 +253,7 @@
     background: var(--input-bg);
     color: var(--text);
   }
-  .menu-search { flex: 1 1 220px; display: flex; flex-direction: column; gap: 8px; }
+  .menu-search { flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; }
   .plato-search-results { max-height: 40vh; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 10px; }
   .plato-search-item { padding: 10px 12px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
   .plato-search-item:last-child { border-bottom: none; }
@@ -794,8 +795,11 @@ function renderMenuBuilderView() {
       const p = platosDb.find(x => x.nombre === el.dataset.nombre);
       if (!p) return;
       const line = `${p.nombre} $ ${Math.round(p.ultimoPrecio)}`;
-      const current = menuBuilderState.text;
-      menuBuilderState.text = current && !current.endsWith('\n') ? current + '\n' + line + '\n' : current + line + '\n';
+      let current = menuBuilderState.text;
+      if (current && !/\n\s*\n$/.test(current)) {
+        current = current.replace(/\n*$/, '') + '\n\n';
+      }
+      menuBuilderState.text = current + line + '\n\n';
       editor.value = menuBuilderState.text;
       editor.scrollTop = editor.scrollHeight;
       editor.focus();
@@ -1176,7 +1180,8 @@ function renderAll() {
     requestAnimationFrame(fitToViewport);
     return;
   }
-  fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos' || view === 'menuBuilder');
+  fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos');
+  fitWrapEl.classList.toggle('menu-wide', view === 'menuBuilder');
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
