@@ -264,7 +264,7 @@
   .menu-editor { flex: 2.2 1 320px; min-width: 320px; }
   .menu-textarea {
     width: 100%;
-    min-height: 46vh;
+    min-height: 68vh;
     resize: vertical;
     padding: 12px;
     font-size: 1rem;
@@ -272,10 +272,11 @@
     line-height: 1.5;
     border-radius: 10px;
     border: 1px solid var(--card-border);
-    background: var(--input-bg);
-    color: var(--text);
+    background: #ffffff;
+    color: #1b1f27;
   }
   .menu-search { flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; }
+  .plato-category-pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .plato-search-results { max-height: 40vh; overflow-y: auto; border: 1px solid var(--card-border); border-radius: 10px; }
   .plato-search-item { padding: 10px 12px; border-bottom: 1px solid var(--card-border); cursor: pointer; }
   .plato-search-item:last-child { border-bottom: none; }
@@ -283,9 +284,63 @@
   .plato-search-name { font-weight: 600; }
   .plato-search-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
   .plato-search-empty { padding: 14px; text-align: center; color: var(--muted); }
+  .plato-search-hint {
+    padding: 16px 14px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.88rem;
+    border: 1px dashed var(--card-border);
+    border-radius: 10px;
+  }
+  .postres-btn { background: var(--card); border: 1px solid var(--card-border); color: var(--text); }
   .new-plato-row { margin-bottom: 10px; }
   .new-plato-name { font-weight: 600; margin-bottom: 4px; }
   .theme-toggle { font-size: 1rem; padding: 10px 12px; }
+
+  /* postres modal */
+  .postres-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 50;
+  }
+  .postres-modal {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    width: 100%;
+    max-width: 760px;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .postres-grid {
+    display: grid;
+    grid-auto-rows: 1fr;
+    gap: 8px;
+    overflow-y: auto;
+  }
+  .postre-chip {
+    padding: 12px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--text);
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .postre-chip.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 </style>
 </head>
 <body>
