@@ -195,6 +195,32 @@ async function handleSavePlato(request, env) {
   return json(env, 200, { ok: true });
 }
 
+async function handleDeletePlato(request, env) {
+  if (!checkPassword(request, env)) {
+    return json(env, 401, { ok: false, error: 'bad_password' });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return json(env, 400, { ok: false, error: 'bad_json' });
+  }
+
+  if (typeof body.nombre !== 'string' || body.nombre.trim().length === 0) {
+    return json(env, 400, { ok: false, error: 'invalid_nombre' });
+  }
+
+  const currentCsv = (await env.DB.get(PLATOS_DB_KEY)) ?? (PLATOS_CSV_HEADER + '\n');
+  let rows = parsePlatosCSV(currentCsv);
+  rows = rows.filter((row) => row.nombre !== body.nombre);
+  const newCsv = serializePlatosCSV(rows);
+
+  await env.DB.put(PLATOS_DB_KEY, newCsv);
+
+  return json(env, 200, { ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -219,7 +245,11 @@ export default {
       return handleSavePlato(request, env);
     }
 
-    const knownPaths = ['/api/data', '/api/save', '/api/platos', '/api/platos/save'];
+    if (url.pathname === '/api/platos/delete' && request.method === 'POST') {
+      return handleDeletePlato(request, env);
+    }
+
+    const knownPaths = ['/api/data', '/api/save', '/api/platos', '/api/platos/save', '/api/platos/delete'];
     if (!knownPaths.includes(url.pathname)) {
       return json(env, 404, { ok: false, error: 'not_found' });
     }

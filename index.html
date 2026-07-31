@@ -342,6 +342,7 @@
     justify-content: center;
   }
   .postre-chip.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .plato-delete-btn { padding: 4px 8px; font-size: 0.9rem; min-width: auto; }
 </style>
 </head>
 <body>
@@ -484,6 +485,10 @@ function isFirstOfMonth(iso) { return Number(iso.split('-')[2]) === 1; }
 let db = [];
 let platosDb = [];
 let platoForm = null;
+let platosViewState = null;
+function freshPlatosViewState() {
+  return { search: '', confirmDelete: null, deleting: false, error: '' };
+}
 const PLATO_CATEGORIAS = ['Carne', 'Pollo', 'Cerdo', 'Pescado', 'Pasta', 'Arroz', 'Ensalada', 'Guarnición', 'Postre', 'Bebida'];
 function freshPlatoForm() {
   return { nombre: '', categoria: '', ultimoPrecio: '', editingNombre: null, error: '', saving: false };
@@ -760,7 +765,10 @@ function renderPlatosView() {
   dateBarEl.innerHTML = '';
   stepperEl.innerHTML = '';
 
-  const rows = [...platosDb].sort((a, b) => a.categoria.localeCompare(b.categoria) || a.nombre.localeCompare(b.nombre));
+  const q = normalizeName(platosViewState.search);
+  const rows = [...platosDb]
+    .filter(p => !q || normalizeName(p.nombre).includes(q))
+    .sort((a, b) => a.categoria.localeCompare(b.categoria) || a.nombre.localeCompare(b.nombre));
 
   const rowsHtml = rows.length ? rows.map(p => `
     <tr class="plato-row" data-nombre="${escapeHtml(p.nombre)}">
@@ -768,7 +776,8 @@ function renderPlatosView() {
       <td>${escapeHtml(p.categoria)}</td>
       <td>${toDisplayDate(p.ultimaFecha)}</td>
       <td>${fmt(p.ultimoPrecio)}</td>
-    </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);">No hay platos cargados</td></tr>`;
+      <td><button type="button" class="secondary plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}">🗑</button></td>
+    </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);">${q ? 'Sin resultados' : 'No hay platos cargados'}</td></tr>`;
 
   const editing = !!platoForm.editingNombre;
   const categoriaOptions = PLATO_CATEGORIAS.map(c => `<option value="${escapeHtml(c)}">`).join('');
@@ -776,9 +785,10 @@ function renderPlatosView() {
   appEl.innerHTML = `
     <div class="card">
       <div class="gate-title">Platos</div>
+      <input id="platosSearchInput" class="pw-input" placeholder="Buscar plato..." value="${escapeHtml(platosViewState.search)}">
       <div class="billing-table-wrap">
         <table class="billing">
-          <thead><tr><th>Nombre</th><th>Categoría</th><th>Últ. uso</th><th>Últ. precio</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Categoría</th><th>Últ. uso</th><th>Últ. precio</th><th style="width:3.5ch;"></th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>
@@ -787,21 +797,39 @@ function renderPlatosView() {
       <input id="platoCategoria" class="pw-input" list="platoCategoriaList" placeholder="Categoría (ej. Carne, Pollo, Arroz)" value="${escapeHtml(platoForm.categoria)}">
       <datalist id="platoCategoriaList">${categoriaOptions}</datalist>
       <input id="platoPrecio" class="pw-input" type="number" step="any" min="0" placeholder="Último precio" value="${platoForm.ultimoPrecio}">
-      <div class="error">${platoForm.error || ''}</div>
+      <div class="error">${platoForm.error || platosViewState.error || ''}</div>
       <div class="controls">
         ${editing ? '<button class="secondary" id="cancelPlatoBtn">Cancelar</button>' : ''}
         <button id="savePlatoBtn" ${platoForm.saving ? 'disabled' : ''}>${platoForm.saving ? 'Guardando…' : (editing ? 'Guardar cambios' : 'Agregar plato')}</button>
       </div>
       <div class="controls">
         <button class="secondary" id="backToMenuFromPlatosBtn">← Volver al menú</button>
+        <button class="secondary" id="backToBuilderFromPlatosBtn">← Volver al armado de menú</button>
       </div>
-    </div>`;
+    </div>
+    ${platosViewState.confirmDelete ? renderDeletePlatoModalHtml() : ''}`;
+
+  const searchInput = appEl.querySelector('#platosSearchInput');
+  searchInput.oninput = (e) => {
+    platosViewState.search = e.target.value;
+    const caret = e.target.selectionStart;
+    renderAll();
+    const newInput = appEl.querySelector('#platosSearchInput');
+    if (newInput) { newInput.focus(); newInput.setSelectionRange(caret, caret); }
+  };
 
   appEl.querySelectorAll('.plato-row').forEach(el => {
     el.onclick = () => {
       const p = platosDb.find(x => x.nombre === el.dataset.nombre);
       if (!p) return;
       platoForm = { nombre: p.nombre, categoria: p.categoria, ultimoPrecio: p.ultimoPrecio, editingNombre: p.nombre, error: '', saving: false };
+      renderAll();
+    };
+  });
+  appEl.querySelectorAll('.plato-delete-btn').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      platosViewState.confirmDelete = el.dataset.nombre;
       renderAll();
     };
   });
@@ -812,6 +840,67 @@ function renderPlatosView() {
   const cancelBtn = appEl.querySelector('#cancelPlatoBtn');
   if (cancelBtn) cancelBtn.onclick = () => { platoForm = freshPlatoForm(); renderAll(); };
   appEl.querySelector('#backToMenuFromPlatosBtn').onclick = () => { view = 'menu'; renderAll(); };
+  appEl.querySelector('#backToBuilderFromPlatosBtn').onclick = () => { view = 'menuBuilder'; renderAll(); };
+
+  if (platosViewState.confirmDelete) wireDeletePlatoModal();
+}
+
+function renderDeletePlatoModalHtml() {
+  const nombre = platosViewState.confirmDelete;
+  return `
+    <div class="postres-modal-overlay" id="deletePlatoOverlay">
+      <div class="postres-modal" style="max-width:480px;">
+        <div class="gate-title" style="margin-bottom:0;">¿Eliminar este plato?</div>
+        <div style="color:var(--text);">Vas a eliminar <strong>${escapeHtml(nombre)}</strong> de la base de platos. Esta acción no se puede deshacer.</div>
+        <div class="error">${platosViewState.error || ''}</div>
+        <div class="controls">
+          <button class="secondary" id="cancelDeletePlatoBtn" ${platosViewState.deleting ? 'disabled' : ''}>Cancelar</button>
+          <button id="confirmDeletePlatoBtn" ${platosViewState.deleting ? 'disabled' : ''}>${platosViewState.deleting ? 'Eliminando…' : 'Sí, eliminar'}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wireDeletePlatoModal() {
+  const overlay = appEl.querySelector('#deletePlatoOverlay');
+  if (!overlay) return;
+  overlay.querySelector('#cancelDeletePlatoBtn').onclick = () => {
+    platosViewState.confirmDelete = null;
+    platosViewState.error = '';
+    renderAll();
+  };
+  overlay.querySelector('#confirmDeletePlatoBtn').onclick = deletePlato;
+}
+
+async function deletePlato() {
+  const nombre = platosViewState.confirmDelete;
+  platosViewState.deleting = true;
+  platosViewState.error = '';
+  renderAll();
+
+  try {
+    const res = await fetch(WORKER_BASE + '/api/platos/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      body: JSON.stringify({ nombre }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      platosViewState.deleting = false;
+      platosViewState.error = errorMessage(data.error);
+      renderAll();
+      return;
+    }
+    platosDb = platosDb.filter(p => p.nombre !== nombre);
+    if (platoForm.editingNombre === nombre) platoForm = freshPlatoForm();
+    platosViewState.deleting = false;
+    platosViewState.confirmDelete = null;
+    renderAll();
+  } catch (e) {
+    platosViewState.deleting = false;
+    platosViewState.error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
+    renderAll();
+  }
 }
 
 function renderMenuBuilderView() {
@@ -909,7 +998,7 @@ function renderMenuBuilderView() {
     };
   });
 
-  appEl.querySelector('#goPlatosFromBuilderBtn').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); renderAll(); };
+  appEl.querySelector('#goPlatosFromBuilderBtn').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); platosViewState = freshPlatosViewState(); renderAll(); };
   appEl.querySelector('#backToMenuFromBuilderBtn').onclick = () => { view = 'menu'; renderAll(); };
   appEl.querySelector('#copiarMenuBtn').onclick = onCopiarMenuClick;
 
