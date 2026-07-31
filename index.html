@@ -288,8 +288,8 @@
     background: var(--card);
     border: 1px dashed var(--card-border);
     color: var(--text);
-    flex: 1;
-    min-height: 40vh;
+    flex: none;
+    padding: 20px 12px;
     font-size: 1.1rem;
     border-radius: 10px;
   }
@@ -748,13 +748,11 @@ function renderMenu() {
       <div class="menu-buttons">
         <button id="goCierre">Sistema de cierre de caja</button>
         <button class="secondary" id="goFacturacion">Ver facturación de Los Pumas Cafe</button>
-        <button class="secondary" id="goPlatos">Gestionar platos</button>
         <button class="secondary" id="goMenuBuilder">Armar menú del día</button>
       </div>
     </div>`;
   appEl.querySelector('#goCierre').onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
   appEl.querySelector('#goFacturacion').onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
-  appEl.querySelector('#goPlatos').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); renderAll(); };
   appEl.querySelector('#goMenuBuilder').onclick = () => { view = 'menuBuilder'; if (!menuBuilderState) menuBuilderState = freshMenuBuilderState(); renderAll(); };
 }
 
@@ -869,6 +867,7 @@ function renderMenuBuilderView() {
       <div class="error">${menuBuilderState.error || ''}</div>
       ${successMsg ? `<div class="success" style="font-size:1rem;">${successMsg}</div>` : ''}
       <div class="controls">
+        <button class="secondary" id="goPlatosFromBuilderBtn">⚙️ Gestionar platos</button>
         <button class="secondary" id="backToMenuFromBuilderBtn">← Volver al menú</button>
         <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
       </div>
@@ -910,6 +909,7 @@ function renderMenuBuilderView() {
     };
   });
 
+  appEl.querySelector('#goPlatosFromBuilderBtn').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); renderAll(); };
   appEl.querySelector('#backToMenuFromBuilderBtn').onclick = () => { view = 'menu'; renderAll(); };
   appEl.querySelector('#copiarMenuBtn').onclick = onCopiarMenuClick;
 
@@ -1160,12 +1160,19 @@ function renderApp() {
     <table class="ledger">${buildRows()}</table>
     <div class="error">${state.error || ''}</div>
     <div class="controls">
+      <button class="secondary" id="backToMenuFromCierreBtn" ${state.saving ? 'disabled' : ''}>← Volver al menú</button>
       <button class="secondary" id="backBtn" ${state.activeIndex === 0 || state.saving ? 'disabled' : ''}>← Atrás</button>
       <button id="confirmBtn" ${state.saving ? 'disabled' : ''}>${isFinalStep ? (state.saving ? 'Guardando…' : 'Guardar día') : 'Confirmar →'}</button>
     </div>
   `;
   appEl.innerHTML = '';
   appEl.appendChild(card);
+
+  card.querySelector('#backToMenuFromCierreBtn').onclick = () => {
+    if (state.saving) return;
+    view = 'menu';
+    renderAll();
+  };
 
   card.querySelector('#backBtn').onclick = () => {
     if (state.activeIndex === 0 || state.saving) return;
