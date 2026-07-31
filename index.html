@@ -867,8 +867,8 @@ function renderMenuBuilderView() {
       <div class="error">${menuBuilderState.error || ''}</div>
       ${successMsg ? `<div class="success" style="font-size:1rem;">${successMsg}</div>` : ''}
       <div class="controls">
-        <button class="secondary" id="goPlatosFromBuilderBtn">⚙️ Gestionar platos</button>
         <button class="secondary" id="backToMenuFromBuilderBtn">← Volver al menú</button>
+        <button class="secondary" id="goPlatosFromBuilderBtn">⚙️ Gestionar platos</button>
         <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
       </div>
     </div>
