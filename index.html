@@ -48,7 +48,7 @@
     transform-origin: center center;
   }
 
-  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
   .subtitle { color: var(--muted); font-size: 1rem; }
   .history-toggle {
@@ -64,8 +64,10 @@
   /* fecha */
   .date-bar {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     background: var(--card);
     border: 1px solid var(--card-border);
     border-radius: 12px;
@@ -137,7 +139,8 @@
   }
   table.ledger .note-inline { font-size: 0.78rem; color: var(--muted); display: block; margin-top: 3px; font-weight: 400; }
 
-  .controls { display: flex; gap: 10px; margin-top: 14px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .controls button { min-width: 120px; }
   button {
     padding: 12px;
     font-size: 1rem;
@@ -183,10 +186,10 @@
   .history-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .history-title h2 { font-size: 1.1rem; margin: 0; }
   .history-close { flex: none; width: auto; padding: 6px 10px; background: transparent; border: 1px solid var(--card-border); color: var(--text); font-size: 1rem; }
-  table.history { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  table.history th, table.history td { text-align: right; padding: 7px 5px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+  table.history { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.68rem; }
+  table.history th, table.history td { text-align: right; padding: 5px 3px; border-bottom: 1px solid var(--card-border); white-space: normal; word-break: break-word; }
   table.history th:first-child, table.history td:first-child { text-align: left; }
-  .history-wrap { overflow-x: auto; }
+  .history-wrap { overflow-x: hidden; }
 
   .pw-input {
     width: 100%;
@@ -805,6 +808,10 @@ function renderAll() {
 }
 
 window.addEventListener('resize', fitToViewport);
+window.addEventListener('orientationchange', () => setTimeout(fitToViewport, 100));
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitToViewport);
+}
 document.getElementById('menuBtn').onclick = () => { view = 'menu'; renderAll(); };
 
 async function submitPassword(pw) {
