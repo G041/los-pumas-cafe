@@ -490,7 +490,10 @@ function freshPlatoForm() {
 
 let menuBuilderState = null;
 function freshMenuBuilderState() {
-  return { text: '', search: '', confirmingNew: null, pendingUpdates: null, error: '', saving: false, success: false };
+  return {
+    text: '', search: '', categoriaFilter: '', confirmingNew: null, pendingUpdates: null, error: '', saving: false, success: false,
+    postresModalOpen: false, selectedPostres: new Set(), postresWorking: null, lastPostresLine: '',
+  };
 }
 function normalizeName(s) {
   return String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -822,14 +825,27 @@ function renderMenuBuilderView() {
   }
 
   const q = normalizeName(menuBuilderState.search);
-  const results = (q ? platosDb.filter(p => normalizeName(p.nombre).includes(q)) : platosDb)
-    .slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const cat = menuBuilderState.categoriaFilter;
+  const active = !!(q || cat);
+  const pool = platosDb.filter(p => p.categoria !== 'Postre');
+  let results = [];
+  if (active) {
+    results = pool
+      .filter(p => (!cat || p.categoria === cat) && (!q || normalizeName(p.nombre).includes(q)))
+      .slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
 
-  const resultsHtml = results.length ? results.map(p => `
-    <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}">
-      <div class="plato-search-name">${escapeHtml(p.nombre)}</div>
-      <div class="plato-search-meta">${escapeHtml(p.categoria)} · Últ. uso ${toDisplayDate(p.ultimaFecha)} · $ ${fmt(p.ultimoPrecio)}</div>
-    </div>`).join('') : `<div class="plato-search-empty">Sin resultados</div>`;
+  const resultsHtml = !active
+    ? `<div class="plato-search-hint">Busca un plato o elegí una categoría para ver opciones.</div>`
+    : `<div class="plato-search-results">${results.length ? results.map(p => `
+        <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}">
+          <div class="plato-search-name">${escapeHtml(p.nombre)}</div>
+          <div class="plato-search-meta">${escapeHtml(p.categoria)} · Últ. uso ${toDisplayDate(p.ultimaFecha)} · $ ${fmt(p.ultimoPrecio)}</div>
+        </div>`).join('') : `<div class="plato-search-empty">Sin resultados</div>`}</div>`;
+
+  const categoriaPillsHtml = PLATO_CATEGORIAS.filter(c => c !== 'Postre').map(c =>
+    `<div class="month-tab plato-cat-pill ${cat === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</div>`
+  ).join('');
 
   let successMsg = '';
   if (menuBuilderState.success === 'copied') successMsg = 'Menú guardado y copiado al portapapeles ✔';
@@ -844,7 +860,9 @@ function renderMenuBuilderView() {
         </div>
         <div class="menu-search">
           <input id="menuSearchInput" class="pw-input" placeholder="Buscar plato (ej. bife de chorizo)" value="${escapeHtml(menuBuilderState.search)}">
-          <div class="plato-search-results">${resultsHtml}</div>
+          <div class="plato-category-pills">${categoriaPillsHtml}</div>
+          <button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>
+          ${resultsHtml}
         </div>
       </div>
       <div class="error">${menuBuilderState.error || ''}</div>
@@ -853,7 +871,8 @@ function renderMenuBuilderView() {
         <button class="secondary" id="backToMenuFromBuilderBtn">← Volver al menú</button>
         <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
       </div>
-    </div>`;
+    </div>
+    ${menuBuilderState.postresModalOpen ? renderPostresModalHtml() : ''}`;
 
   const editor = appEl.querySelector('#menuEditor');
   editor.oninput = (e) => { menuBuilderState.text = e.target.value; };
@@ -866,6 +885,13 @@ function renderMenuBuilderView() {
     const newInput = appEl.querySelector('#menuSearchInput');
     if (newInput) { newInput.focus(); newInput.setSelectionRange(caret, caret); }
   };
+
+  appEl.querySelectorAll('.plato-cat-pill').forEach(el => {
+    el.onclick = () => {
+      menuBuilderState.categoriaFilter = menuBuilderState.categoriaFilter === el.dataset.cat ? '' : el.dataset.cat;
+      renderAll();
+    };
+  });
 
   appEl.querySelectorAll('.plato-search-item').forEach(el => {
     el.onclick = () => {
@@ -885,6 +911,83 @@ function renderMenuBuilderView() {
 
   appEl.querySelector('#backToMenuFromBuilderBtn').onclick = () => { view = 'menu'; renderAll(); };
   appEl.querySelector('#copiarMenuBtn').onclick = onCopiarMenuClick;
+
+  const postresBtn = appEl.querySelector('#postresBtn');
+  if (postresBtn) postresBtn.onclick = () => {
+    menuBuilderState.postresWorking = new Set(menuBuilderState.selectedPostres);
+    menuBuilderState.postresModalOpen = true;
+    renderAll();
+  };
+
+  if (menuBuilderState.postresModalOpen) wirePostresModal();
+}
+
+function renderPostresModalHtml() {
+  const postres = platosDb.filter(p => p.categoria === 'Postre').slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const cols = Math.max(1, Math.ceil(postres.length / 3));
+  const working = menuBuilderState.postresWorking || new Set();
+  const chipsHtml = postres.map(p => `
+    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</div>
+  `).join('');
+
+  return `
+    <div class="postres-modal-overlay" id="postresOverlay">
+      <div class="postres-modal">
+        <div class="gate-title" style="margin-bottom:0;">Postres disponibles</div>
+        <div class="postres-grid" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
+        <div class="controls">
+          <button class="secondary" id="postresCancelBtn">Cancelar</button>
+          <button id="postresConfirmBtn">Confirmar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wirePostresModal() {
+  const overlay = appEl.querySelector('#postresOverlay');
+  if (!overlay) return;
+
+  overlay.querySelectorAll('.postre-chip').forEach(el => {
+    el.onclick = () => {
+      const nombre = el.dataset.nombre;
+      const working = menuBuilderState.postresWorking;
+      if (working.has(nombre)) working.delete(nombre); else working.add(nombre);
+      renderAll();
+    };
+  });
+
+  overlay.querySelector('#postresCancelBtn').onclick = () => {
+    menuBuilderState.postresModalOpen = false;
+    menuBuilderState.postresWorking = null;
+    renderAll();
+  };
+
+  overlay.querySelector('#postresConfirmBtn').onclick = () => {
+    menuBuilderState.selectedPostres = new Set(menuBuilderState.postresWorking);
+    const line = platosDb
+      .filter(p => p.categoria === 'Postre' && menuBuilderState.selectedPostres.has(p.nombre))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map(p => p.nombre)
+      .join(' / ');
+
+    let current = menuBuilderState.text;
+    if (menuBuilderState.lastPostresLine && current.includes(menuBuilderState.lastPostresLine)) {
+      current = current.replace(menuBuilderState.lastPostresLine, line);
+      if (!line) current = current.replace(/\s+$/, '');
+    } else if (line) {
+      if (current && !/\n\s*\n$/.test(current)) {
+        current = current.replace(/\n*$/, '') + '\n\n';
+      }
+      current = current + line;
+    }
+    menuBuilderState.text = current;
+    menuBuilderState.lastPostresLine = line;
+    menuBuilderState.postresModalOpen = false;
+    menuBuilderState.postresWorking = null;
+    renderAll();
+    const editor = appEl.querySelector('#menuEditor');
+    if (editor) { editor.scrollTop = editor.scrollHeight; editor.focus(); }
+  };
 }
 
 function renderMenuBuilderConfirmView() {
