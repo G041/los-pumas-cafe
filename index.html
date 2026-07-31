@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Los Pumas Cafe — Cierre diario</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --card-border: #2a2e38;
+    --text: #eef0f3;
+    --muted: #9aa1ad;
+    --accent: #4f8cff;
+    --accent-text: #ffffff;
+    --ok: #3ecf8e;
+    --danger: #ff6b6b;
+    --locked: #4a505c;
+  }
+  * { box-sizing: border-box; }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  html { font-size: 19px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background:
+      linear-gradient(rgba(10,11,14,0.88), rgba(10,11,14,0.93)),
+      url('los-pumas-cafe.jpg') center / cover no-repeat fixed;
+    color: var(--text);
+  }
+  .viewport {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+  #fitWrap {
+    width: 100%;
+    max-width: 560px;
+    transform-origin: center center;
+  }
+
+  .top-bar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  h1 { font-size: 1.7rem; margin: 0 0 2px; }
+  .subtitle { color: var(--muted); font-size: 1rem; }
+  .history-toggle {
+    flex: none;
+    width: auto;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--text);
+  }
+
+  /* fecha */
+  .date-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    font-size: 1.05rem;
+  }
+  .date-bar strong { font-size: 1.15rem; }
+  .date-edit { display: flex; gap: 8px; align-items: center; }
+  .date-edit input { font-size: 1rem; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background: #0c0e12; color: var(--text); }
+
+  /* stepper */
+  .stepper {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+    padding-bottom: 4px;
+  }
+  .step-pill {
+    flex: 0 0 auto;
+    padding: 6px 11px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .step-pill.done { background: #163d2c; border-color: #1f5c40; color: var(--ok); }
+  .step-pill.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+
+  /* ledger table */
+  table.ledger { width: 100%; border-collapse: collapse; }
+  table.ledger td { padding: 8px 6px; font-size: 1.05rem; vertical-align: middle; }
+  table.ledger tr.locked td { color: var(--locked); }
+  table.ledger .op { width: 1.4em; text-align: center; color: var(--muted); font-weight: 700; font-size: 1.1rem; }
+  table.ledger .label { text-align: left; }
+  table.ledger .val { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  table.ledger tr.subtotal td { border-top: 2px solid var(--card-border); font-weight: 700; padding-top: 10px; }
+  table.ledger tr.final-row td { border-top: 2px solid var(--accent); padding-top: 12px; font-size: 1.35rem; }
+  table.ledger tr.final-row .val { color: var(--ok); }
+  table.ledger tr.final-row .val.negative { color: var(--danger); }
+  table.ledger .val input {
+    width: 100%;
+    max-width: 200px;
+    text-align: right;
+    padding: 8px 10px;
+    font-size: 1.05rem;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: #0c0e12;
+    color: var(--text);
+  }
+  table.ledger .note-inline { font-size: 0.78rem; color: var(--muted); display: block; margin-top: 3px; font-weight: 400; }
+
+  .controls { display: flex; gap: 10px; margin-top: 14px; }
+  button {
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-text);
+    cursor: pointer;
+    flex: 1;
+  }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
+  button.link-btn { background: none; border: none; color: var(--accent); font-size: 0.95rem; width: auto; padding: 4px; flex: none; }
+
+  .error { color: var(--danger); font-size: 0.9rem; margin-top: 8px; }
+  .note { background: #1c2230; border: 1px solid #2c3550; color: #a9c0ff; font-size: 0.9rem; padding: 10px 12px; border-radius: 10px; margin-top: 10px; }
+  .success { color: var(--ok); font-weight: 700; text-align: center; font-size: 1.25rem; margin-bottom: 14px; }
+
+  /* historial widget lateral */
+  #historyBackdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 40;
+  }
+  #historyBackdrop.open { opacity: 1; pointer-events: auto; }
+  #historyPanel {
+    position: fixed; top: 0; right: 0;
+    height: 100%;
+    width: min(380px, 88vw);
+    background: var(--card);
+    border-left: 1px solid var(--card-border);
+    box-shadow: -10px 0 30px rgba(0,0,0,0.45);
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 50;
+    padding: 18px;
+    overflow-y: auto;
+  }
+  #historyPanel.open { transform: translateX(0); }
+  .history-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .history-title h2 { font-size: 1.1rem; margin: 0; }
+  .history-close { flex: none; width: auto; padding: 6px 10px; background: transparent; border: 1px solid var(--card-border); color: var(--text); font-size: 1rem; }
+  table.history { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.history th, table.history td { text-align: right; padding: 7px 5px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+  table.history th:first-child, table.history td:first-child { text-align: left; }
+  .history-wrap { overflow-x: auto; }
+
+  .pw-input {
+    width: 100%;
+    margin-top: 14px;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: #0c0e12;
+    color: var(--text);
+  }
+  .retry-btn { margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="viewport">
+  <div id="fitWrap">
+    <div class="top-bar">
+      <div>
+        <h1>Los Pumas Cafe</h1>
+        <div class="subtitle">Cierre diario de Fabian</div>
+      </div>
+      <button class="history-toggle" id="historyToggleBtn">Mostrar historial</button>
+    </div>
+
+    <div id="dateBar" class="date-bar"></div>
+    <div id="stepper" class="stepper"></div>
+    <div id="app"></div>
+  </div>
+</div>
+
+<div id="historyBackdrop"></div>
+<div id="historyPanel">
+  <div class="history-title">
+    <h2>Historial</h2>
+    <button class="history-close" id="historyCloseBtn">Cerrar ✕</button>
+  </div>
+  <button class="link-btn" id="downloadBtn" style="margin-bottom:12px;">Descargar CSV</button>
+  <div class="history-wrap">
+    <table class="history" id="historyTable">
+      <thead>
+        <tr><th>Fecha</th><th>C</th><th>V</th><th>F</th><th>T</th><th>Apertura</th><th>Final</th><th>Platos</th><th>Fiscal</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const RAW_CSV_URL = 'https://raw.githubusercontent.com/G041/los-pumas-cafe/main/data.csv';
+const WORKER_URL = 'REPLACE_WITH_WORKER_URL/api/save';
+
+async function loadDB() {
+  const res = await fetch(RAW_CSV_URL + '?_=' + Date.now(), { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return parseCSV(await res.text());
+}
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  lines.shift(); // header
+  return lines.map(line => {
+    const [date, C, V, F, T, opening, final, platos, fiscal] = line.split(',');
+    const Cn = Number(C), Vn = Number(V), Fn = Number(F);
+    return {
+      dateISO: date,
+      C: Cn, V: Vn, F: Fn, T: Number(T),
+      s3: Cn + Vn + Fn,
+      opening: Number(opening),
+      final: Number(final),
+      platos: parseInt(platos, 10),
+      fiscal: Number(fiscal),
+    };
+  });
+}
+function fmt(n) { return Number(n).toLocaleString('es-AR'); }
+function toDisplayDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
+function isoToday() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0, 10);
+}
+function prevIsoDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+function isFirstOfMonth(iso) { return Number(iso.split('-')[2]) === 1; }
+
+let db = [];
+let dbStatus = 'loading'; // 'loading' | 'ready' | 'error'
+let dbError = '';
+
+const STEPS = ['C', 'V', 'F', 'T', 'opening', 'platos', 'fiscal'];
+const META = {
+  C:       { label: 'C - Efectivo',       op: '',  kind: 'money' },
+  V:       { label: 'V - Visa/Tarjeta',   op: '+', kind: 'money' },
+  F:       { label: 'F - Fabian',         op: '+', kind: 'money' },
+  T:       { label: 'T - Total Gastos',   op: '+', kind: 'money' },
+  opening: { label: 'Apertura',           op: '−', kind: 'opening' },
+  platos:  { label: 'Platos',             op: '',  kind: 'platos' },
+  fiscal:  { label: 'Fiscal',             op: '',  kind: 'money' },
+};
+
+let state = null;
+function freshState() {
+  return {
+    dateISO: isoToday(),
+    values: { C: null, V: null, F: null, T: null, opening: null, platos: null, fiscal: null },
+    openingSource: null,
+    activeIndex: 0,
+    editingDate: false,
+    error: '',
+    saved: false,
+    saving: false,
+    password: '',
+  };
+}
+state = freshState();
+
+const dateBarEl = document.getElementById('dateBar');
+const stepperEl = document.getElementById('stepper');
+const appEl = document.getElementById('app');
+const fitWrapEl = document.getElementById('fitWrap');
+const historyPanelEl = document.getElementById('historyPanel');
+const historyBackdropEl = document.getElementById('historyBackdrop');
+
+function s3() { return (state.values.C||0) + (state.values.V||0) + (state.values.F||0); }
+function s4() { return s3() + (state.values.T||0); }
+function finalResult() { return s4() - (state.values.opening||0); }
+
+function renderDateBar() {
+  if (state.editingDate) {
+    dateBarEl.innerHTML = `
+      <div class="date-edit">
+        <span>Fecha:</span>
+        <input type="date" id="dateInput" value="${state.dateISO}">
+      </div>
+    `;
+    dateBarEl.querySelector('#dateInput').onchange = (e) => {
+      if (!e.target.value) return;
+      state.dateISO = e.target.value;
+      state.editingDate = false;
+      renderAll();
+    };
+  } else {
+    dateBarEl.innerHTML = `
+      <span>Cerrando el día <strong>${toDisplayDate(state.dateISO)}</strong></span>
+      <button class="link-btn" id="changeDateBtn">Cambiar fecha</button>
+    `;
+    dateBarEl.querySelector('#changeDateBtn').onclick = () => {
+      state.editingDate = true;
+      renderAll();
+    };
+  }
+}
+
+function renderStepper() {
+  const labels = { C: 'C', V: 'V', F: 'F', T: 'T', opening: 'Apertura', platos: 'Platos', fiscal: 'Fiscal' };
+  stepperEl.innerHTML = STEPS.map((key, i) => {
+    const cls = i < state.activeIndex ? 'done' : (i === state.activeIndex && !state.saved ? 'active' : '');
+    return `<div class="step-pill ${cls}">${labels[key]}</div>`;
+  }).join('');
+}
+
+function cellContent(key, idx) {
+  const meta = META[key];
+  const committed = idx < state.activeIndex;
+  const active = idx === state.activeIndex && !state.saved;
+
+  if (committed) {
+    if (key === 'platos') return `${state.values.platos}`;
+    return fmt(state.values[key]) + (key === 'opening' && state.openingSource === 'auto' ? '<span class="note-inline">(automático, de ayer)</span>' : '');
+  }
+
+  if (!active) return '—';
+
+  // active row rendering
+  if (key === 'opening') {
+    if (isFirstOfMonth(state.dateISO)) {
+      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura">`;
+    }
+    const prevIso = prevIsoDate(state.dateISO);
+    const prevRecord = db.find(r => r.dateISO === prevIso);
+    if (prevRecord) {
+      state._autoOpening = prevRecord.s3;
+      return `${fmt(prevRecord.s3)}<span class="note-inline">Automático, tomado de ayer (${toDisplayDate(prevIso)})</span>`;
+    } else {
+      state._autoOpening = null;
+      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura">
+        <span class="note-inline">No hay cierre de ayer guardado: ingresá manualmente.</span>`;
+    }
+  }
+  if (key === 'platos') {
+    return `<input type="number" id="stepInput" min="1" max="500" step="1" placeholder="Cantidad">`;
+  }
+  return `<input type="number" id="stepInput" step="any" min="0" placeholder="Monto">`;
+}
+
+function buildRows() {
+  let rows = '';
+  STEPS.forEach((key, idx) => {
+    const meta = META[key];
+    const locked = idx > state.activeIndex || (idx === state.activeIndex && state.saved);
+    rows += `<tr class="${locked ? 'locked' : ''}">
+      <td class="op">${meta.op}</td>
+      <td class="label">${meta.label}</td>
+      <td class="val">${cellContent(key, idx)}</td>
+    </tr>`;
+    if (key === 'F') {
+      const shown = state.activeIndex > idx;
+      rows += `<tr class="subtotal ${shown ? '' : 'locked'}">
+        <td class="op"></td><td class="label">Subtotal (C+V+F)</td>
+        <td class="val">${shown ? fmt(s3()) : '—'}</td></tr>`;
+    }
+    if (key === 'T') {
+      const shown = state.activeIndex > idx;
+      rows += `<tr class="subtotal ${shown ? '' : 'locked'}">
+        <td class="op"></td><td class="label">Suma total</td>
+        <td class="val">${shown ? fmt(s4()) : '—'}</td></tr>`;
+    }
+    if (key === 'opening') {
+      const shown = state.activeIndex > idx;
+      const fr = shown ? finalResult() : 0;
+      rows += `<tr class="final-row ${shown ? '' : 'locked'}">
+        <td class="op"></td><td class="label">RESULTADO FINAL</td>
+        <td class="val ${fr < 0 ? 'negative' : ''}">${shown ? fmt(fr) : '—'}</td></tr>`;
+    }
+  });
+  return rows;
+}
+
+function renderApp() {
+  if (state.saved) {
+    appEl.innerHTML = `
+      <div class="card">
+        <div class="success">Día guardado, Fabian.</div>
+        <button id="newDayBtn">Cargar otro día</button>
+      </div>`;
+    document.getElementById('newDayBtn').onclick = () => { state = freshState(); renderAll(); };
+    return;
+  }
+
+  const isFinalStep = state.activeIndex === STEPS.length;
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <table class="ledger">${buildRows()}</table>
+    ${isFinalStep ? `<input type="password" id="pwInput" class="pw-input" placeholder="Contraseña" value="${state.password || ''}">` : ''}
+    <div class="error">${state.error || ''}</div>
+    <div class="controls">
+      <button class="secondary" id="backBtn" ${state.activeIndex === 0 || state.saving ? 'disabled' : ''}>← Atrás</button>
+      <button id="confirmBtn" ${state.saving ? 'disabled' : ''}>${isFinalStep ? (state.saving ? 'Guardando…' : 'Guardar día') : 'Confirmar →'}</button>
+    </div>
+  `;
+  appEl.innerHTML = '';
+  appEl.appendChild(card);
+
+  card.querySelector('#backBtn').onclick = () => {
+    if (state.activeIndex === 0 || state.saving) return;
+    state.activeIndex -= 1;
+    state.error = '';
+    renderAll();
+  };
+
+  card.querySelector('#confirmBtn').onclick = onConfirm;
+
+  const pwInput = card.querySelector('#pwInput');
+  if (pwInput) {
+    pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') onConfirm(); });
+  }
+
+  const input = card.querySelector('#stepInput');
+  if (input) {
+    input.focus();
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') onConfirm(); });
+  }
+}
+
+function onConfirm() {
+  if (state.activeIndex === STEPS.length) {
+    trySave();
+    return;
+  }
+  const key = STEPS[state.activeIndex];
+  const card = appEl.querySelector('.card');
+  const input = card.querySelector('#stepInput');
+
+  if (key === 'opening' && !isFirstOfMonth(state.dateISO) && state._autoOpening !== null && state._autoOpening !== undefined) {
+    state.values.opening = state._autoOpening;
+    state.openingSource = 'auto';
+    state.error = '';
+    state.activeIndex += 1;
+    renderAll();
+    return;
+  }
+
+  const raw = input ? input.value : '';
+  const v = Number(raw);
+
+  if (key === 'platos') {
+    if (raw === '' || !Number.isInteger(v) || v <= 0 || v > 500) {
+      state.error = 'Platos debe ser un número entero positivo, máximo 500.';
+      renderAll();
+      return;
+    }
+  } else {
+    if (raw === '' || isNaN(v) || v <= 0) {
+      state.error = 'Ingresá un número positivo.';
+      renderAll();
+      return;
+    }
+  }
+
+  state.values[key] = v;
+  if (key === 'opening') {
+    state.openingSource = isFirstOfMonth(state.dateISO) ? 'manual' : 'manual-fallback';
+  }
+  state.error = '';
+  state.activeIndex += 1;
+  renderAll();
+}
+
+function errorMessage(code) {
+  switch (code) {
+    case 'bad_password': return 'Contraseña incorrecta.';
+    case 'invalid_record': return 'Algún valor no es válido. Revisá los números e intentá de nuevo.';
+    default: return 'No se pudo guardar. Revisá tu conexión e intentá de nuevo.';
+  }
+}
+
+async function trySave() {
+  const card = appEl.querySelector('.card');
+  const pwInput = card.querySelector('#pwInput');
+  const password = pwInput ? pwInput.value : '';
+  state.password = password;
+
+  if (!password) {
+    state.error = 'Ingresá la contraseña.';
+    renderAll();
+    return;
+  }
+
+  const record = {
+    dateISO: state.dateISO,
+    C: state.values.C, V: state.values.V, F: state.values.F, T: state.values.T,
+    opening: state.values.opening,
+    final: finalResult(),
+    platos: state.values.platos,
+    fiscal: state.values.fiscal,
+  };
+
+  state.saving = true;
+  state.error = '';
+  renderAll();
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, record }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      state.saving = false;
+      state.error = errorMessage(data.error);
+      renderAll();
+      return;
+    }
+    db = db.filter(r => r.dateISO !== record.dateISO);
+    db.push({ ...record, s3: s3() });
+    db.sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+    state.saving = false;
+    state.saved = true;
+    renderAll();
+    renderHistory();
+  } catch (e) {
+    state.saving = false;
+    state.error = 'No se pudo conectar. Revisá tu conexión e intentá de nuevo.';
+    renderAll();
+  }
+}
+
+function renderHistory() {
+  const tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '';
+  [...db].sort((a, b) => b.dateISO.localeCompare(a.dateISO)).forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${toDisplayDate(r.dateISO)}</td><td>${fmt(r.C)}</td><td>${fmt(r.V)}</td><td>${fmt(r.F)}</td><td>${fmt(r.T)}</td><td>${fmt(r.opening)}</td><td>${fmt(r.final)}</td><td>${r.platos}</td><td>${fmt(r.fiscal)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('downloadBtn').onclick = () => {
+  const header = 'date,C,V,F,T,opening,final,platos,fiscal';
+  const lines = [...db].sort((a, b) => a.dateISO.localeCompare(b.dateISO)).map(r =>
+    [toDisplayDate(r.dateISO), r.C, r.V, r.F, r.T, r.opening, r.final, r.platos, r.fiscal].join(',')
+  );
+  const csv = [header, ...lines].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'los_pumas_cafe_db.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+function openHistory() {
+  historyPanelEl.classList.add('open');
+  historyBackdropEl.classList.add('open');
+}
+function closeHistory() {
+  historyPanelEl.classList.remove('open');
+  historyBackdropEl.classList.remove('open');
+}
+document.getElementById('historyToggleBtn').onclick = openHistory;
+document.getElementById('historyCloseBtn').onclick = closeHistory;
+historyBackdropEl.onclick = closeHistory;
+
+function fitToViewport() {
+  fitWrapEl.style.transform = 'scale(1)';
+  const availH = window.innerHeight - 24;
+  const availW = window.innerWidth - 24;
+  const rect = fitWrapEl.getBoundingClientRect();
+  const scale = Math.min(1, availH / rect.height, availW / rect.width);
+  fitWrapEl.style.transform = `scale(${scale})`;
+}
+
+function renderAll() {
+  if (dbStatus === 'loading') {
+    dateBarEl.innerHTML = '';
+    stepperEl.innerHTML = '';
+    appEl.innerHTML = `<div class="card"><div class="success" style="color:var(--muted)">Cargando datos, Fabian…</div></div>`;
+    requestAnimationFrame(fitToViewport);
+    return;
+  }
+  if (dbStatus === 'error') {
+    dateBarEl.innerHTML = '';
+    stepperEl.innerHTML = '';
+    appEl.innerHTML = `
+      <div class="card">
+        <div class="error" style="margin-top:0;">No se pudo conectar con la base de datos, Fabian.<br>${dbError || ''}</div>
+        <button class="retry-btn" id="retryBtn">Reintentar</button>
+      </div>`;
+    appEl.querySelector('#retryBtn').onclick = init;
+    requestAnimationFrame(fitToViewport);
+    return;
+  }
+  renderDateBar();
+  renderStepper();
+  renderApp();
+  requestAnimationFrame(fitToViewport);
+}
+
+window.addEventListener('resize', fitToViewport);
+
+async function init() {
+  dbStatus = 'loading';
+  dbError = '';
+  renderAll();
+  try {
+    db = await loadDB();
+    dbStatus = 'ready';
+  } catch (e) {
+    dbStatus = 'error';
+    dbError = e.message || '';
+  }
+  renderAll();
+  renderHistory();
+}
+
+init();
+</script>
+</body>
+</html>
