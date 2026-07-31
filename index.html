@@ -8,7 +8,7 @@
 <script>
 (function () {
   try {
-    var t = localStorage.getItem('lospumas_theme') || 'light';
+    var t = localStorage.getItem('lospumas_theme') || 'dark';
     document.documentElement.setAttribute('data-theme', t);
   } catch (e) {}
 })();
@@ -77,7 +77,7 @@
     max-width: 560px;
     transform-origin: center center;
   }
-  #fitWrap.wide { max-width: 760px; }
+  #fitWrap.wide { max-width: 900px; }
 
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
@@ -776,7 +776,7 @@ if (window.visualViewport) {
 }
 document.getElementById('menuBtn').onclick = () => { view = 'menu'; renderAll(); };
 
-function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'light'; }
+function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   try { localStorage.setItem('lospumas_theme', theme); } catch (e) {}
