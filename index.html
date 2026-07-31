@@ -220,6 +220,27 @@
   }
   .month-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
   .billing-table-wrap { max-height: 58vh; overflow-y: auto; overflow-x: hidden; margin: 4px 0 12px; }
+
+  .billing-table-wrap,
+  .plato-search-results,
+  .menu-textarea {
+    scrollbar-width: thin;
+    scrollbar-color: var(--card-border) transparent;
+  }
+  .billing-table-wrap::-webkit-scrollbar,
+  .plato-search-results::-webkit-scrollbar,
+  .menu-textarea::-webkit-scrollbar { width: 8px; height: 8px; }
+  .billing-table-wrap::-webkit-scrollbar-track,
+  .plato-search-results::-webkit-scrollbar-track,
+  .menu-textarea::-webkit-scrollbar-track { background: transparent; }
+  .billing-table-wrap::-webkit-scrollbar-thumb,
+  .plato-search-results::-webkit-scrollbar-thumb,
+  .menu-textarea::-webkit-scrollbar-thumb {
+    background-color: var(--card-border);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
   table.billing {
     table-layout: fixed;
     width: 100%;
