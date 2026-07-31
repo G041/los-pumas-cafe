@@ -284,15 +284,16 @@
   .plato-search-name { font-weight: 600; }
   .plato-search-meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
   .plato-search-empty { padding: 14px; text-align: center; color: var(--muted); }
-  .plato-search-hint {
-    padding: 16px 14px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.88rem;
+  .postres-btn {
+    background: var(--card);
     border: 1px dashed var(--card-border);
+    color: var(--text);
+    flex: 1;
+    min-height: 40vh;
+    font-size: 1.1rem;
     border-radius: 10px;
   }
-  .postres-btn { background: var(--card); border: 1px solid var(--card-border); color: var(--text); }
+  .postres-btn-compact { flex: none; min-height: auto; font-size: 1rem; border-style: solid; }
   .new-plato-row { margin-bottom: 10px; }
   .new-plato-name { font-weight: 600; margin-bottom: 4px; }
   .theme-toggle { font-size: 1rem; padding: 10px 12px; }
@@ -836,7 +837,7 @@ function renderMenuBuilderView() {
   }
 
   const resultsHtml = !active
-    ? `<div class="plato-search-hint">Busca un plato o elegí una categoría para ver opciones.</div>`
+    ? ''
     : `<div class="plato-search-results">${results.length ? results.map(p => `
         <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}">
           <div class="plato-search-name">${escapeHtml(p.nombre)}</div>
@@ -859,10 +860,10 @@ function renderMenuBuilderView() {
           <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día...">${escapeHtml(menuBuilderState.text)}</textarea>
         </div>
         <div class="menu-search">
-          <input id="menuSearchInput" class="pw-input" placeholder="Buscar plato (ej. bife de chorizo)" value="${escapeHtml(menuBuilderState.search)}">
+          <input id="menuSearchInput" class="pw-input" placeholder="Buscá un plato o elegí una categoría para ver opciones" value="${escapeHtml(menuBuilderState.search)}">
           <div class="plato-category-pills">${categoriaPillsHtml}</div>
-          <button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>
-          ${resultsHtml}
+          ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>`}
+          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">🍰 Postres disponibles</button>` : ''}
         </div>
       </div>
       <div class="error">${menuBuilderState.error || ''}</div>
