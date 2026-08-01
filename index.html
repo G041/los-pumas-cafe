@@ -342,7 +342,15 @@
     justify-content: center;
   }
   .postre-chip.selected { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  .plato-delete-btn { padding: 4px 8px; font-size: 0.9rem; min-width: auto; }
+  .plato-delete-btn {
+    padding: 4px 10px;
+    font-size: 0.95rem;
+    font-weight: 800;
+    min-width: auto;
+    background: var(--danger);
+    border: none;
+    color: #ffffff;
+  }
 </style>
 </head>
 <body>
@@ -793,7 +801,7 @@ function renderPlatosView() {
       <td>${escapeHtml(p.categoria)}</td>
       <td>${toDisplayDate(p.ultimaFecha)}</td>
       <td>${fmt(p.ultimoPrecio)}</td>
-      <td><button type="button" class="secondary plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}">🗑</button></td>
+      <td><button type="button" class="plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}">✕</button></td>
     </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);">${q ? 'Sin resultados' : 'No hay platos cargados'}</td></tr>`;
 
   const editing = !!platoForm.editingNombre;
