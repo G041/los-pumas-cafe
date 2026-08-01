@@ -21,9 +21,55 @@ function json(env, status, body) {
   });
 }
 
-function checkPassword(request, env) {
+// Constant-time comparison so a wrong guess that happens to share a long
+// prefix with the real password doesn't finish measurably faster/slower
+// than one that differs on the first byte.
+function timingSafeEqual(a, b) {
+  const bufA = new TextEncoder().encode(a);
+  const bufB = new TextEncoder().encode(b);
+  const len = Math.max(bufA.length, bufB.length, 1);
+  let diff = bufA.length ^ bufB.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (bufA[i] || 0) ^ (bufB[i] || 0);
+  }
+  return diff === 0;
+}
+
+const RATE_LIMIT_MAX_ATTEMPTS = 5;
+const RATE_LIMIT_WINDOW_SECONDS = 300; // 5 min window to accumulate failures
+const RATE_LIMIT_LOCKOUT_SECONDS = 900; // 15 min lockout once tripped
+
+function getClientIP(request) {
+  return request.headers.get('CF-Connecting-IP') || 'unknown';
+}
+
+// Returns a Response to send back immediately if the request should be
+// blocked (locked out or wrong password), or null if the password was correct
+// and the caller should proceed.
+async function checkAuth(request, env) {
+  const ip = getClientIP(request);
+  const lockKey = `ratelimit:lock:${ip}`;
+  const failsKey = `ratelimit:fails:${ip}`;
+
+  if (await env.DB.get(lockKey)) {
+    return json(env, 429, { ok: false, error: 'too_many_attempts' });
+  }
+
   const pw = request.headers.get('X-App-Password') || '';
-  return pw === env.WRITE_PASSWORD;
+  if (timingSafeEqual(pw, env.WRITE_PASSWORD || '')) {
+    await env.DB.delete(failsKey);
+    return null;
+  }
+
+  const fails = (parseInt(await env.DB.get(failsKey), 10) || 0) + 1;
+  if (fails >= RATE_LIMIT_MAX_ATTEMPTS) {
+    await env.DB.put(lockKey, '1', { expirationTtl: RATE_LIMIT_LOCKOUT_SECONDS });
+    await env.DB.delete(failsKey);
+  } else {
+    await env.DB.put(failsKey, String(fails), { expirationTtl: RATE_LIMIT_WINDOW_SECONDS });
+  }
+
+  return json(env, 401, { ok: false, error: 'bad_password' });
 }
 
 function isPositiveNumber(n) {
@@ -115,17 +161,15 @@ function serializePlatosCSV(rows) {
 }
 
 async function handleGetData(request, env) {
-  if (!checkPassword(request, env)) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
+  const denied = await checkAuth(request, env);
+  if (denied) return denied;
   const csv = (await env.DB.get(DB_KEY)) ?? (CSV_HEADER + '\n');
   return json(env, 200, { ok: true, csv });
 }
 
 async function handleSave(request, env) {
-  if (!checkPassword(request, env)) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
+  const denied = await checkAuth(request, env);
+  if (denied) return denied;
 
   let body;
   try {
@@ -159,17 +203,15 @@ async function handleSave(request, env) {
 }
 
 async function handleGetPlatos(request, env) {
-  if (!checkPassword(request, env)) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
+  const denied = await checkAuth(request, env);
+  if (denied) return denied;
   const csv = (await env.DB.get(PLATOS_DB_KEY)) ?? (PLATOS_CSV_HEADER + '\n');
   return json(env, 200, { ok: true, csv });
 }
 
 async function handleSavePlato(request, env) {
-  if (!checkPassword(request, env)) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
+  const denied = await checkAuth(request, env);
+  if (denied) return denied;
 
   let body;
   try {
@@ -196,9 +238,8 @@ async function handleSavePlato(request, env) {
 }
 
 async function handleDeletePlato(request, env) {
-  if (!checkPassword(request, env)) {
-    return json(env, 401, { ok: false, error: 'bad_password' });
-  }
+  const denied = await checkAuth(request, env);
+  if (denied) return denied;
 
   let body;
   try {

@@ -1538,7 +1538,9 @@ async function submitPassword(pw) {
     authStatus = 'ready';
   } catch (e) {
     authStatus = 'gate';
-    authError = e.code === 'bad_password' ? 'Contraseña incorrecta.' : 'No se pudo conectar. Intentá de nuevo.';
+    if (e.code === 'bad_password') authError = 'Contraseña incorrecta.';
+    else if (e.code === 'too_many_attempts') authError = 'Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.';
+    else authError = 'No se pudo conectar. Intentá de nuevo.';
     appPassword = '';
   }
   renderAll();
