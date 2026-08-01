@@ -517,12 +517,29 @@ function parseMenuLines(text) {
     if (!line) return;
     const sepIdx = line.lastIndexOf('$');
     if (sepIdx === -1) return;
-    const nombre = line.slice(0, sepIdx).trim();
+    const nombre = line.slice(0, sepIdx).trim().replace(/^\d+\)\s*/, '');
     const precio = Number(line.slice(sepIdx + 1).trim().replace(/[^\d.]/g, ''));
     if (!nombre || !precio || isNaN(precio) || precio <= 0) return;
     parsed.push({ nombre, precio });
   });
   return parsed;
+}
+// counts how many "N) nombre $ precio" lines are already in the menu, so the
+// next plato added via the search results gets the correct running number.
+function countNumberedPlatos(text) {
+  return text.split(/\r?\n/).filter(l => /^\d+\)\s*\S/.test(l.trim())).length;
+}
+function undoLastPlato() {
+  const lines = menuBuilderState.text.split(/\r?\n/);
+  let idx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/^\d+\)\s*\S/.test(lines[i].trim())) { idx = i; break; }
+  }
+  if (idx === -1) return;
+  lines.splice(idx, 1);
+  // collapse the now-adjacent blank lines left behind by the removed entry
+  const cleaned = lines.join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+  menuBuilderState.text = cleaned;
 }
 async function copyToClipboard(text) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -944,6 +961,9 @@ function renderMenuBuilderView() {
       <div class="gate-title">Armado de menú del día</div>
       <div class="menu-builder-layout">
         <div class="menu-editor">
+          <div style="margin-bottom:6px;">
+            <button type="button" class="secondary" id="undoPlatoBtn" style="width:auto; padding:8px 14px;">↶ Deshacer</button>
+          </div>
           <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día...">${escapeHtml(menuBuilderState.text)}</textarea>
         </div>
         <div class="menu-search">
@@ -986,7 +1006,8 @@ function renderMenuBuilderView() {
     el.onclick = () => {
       const p = platosDb.find(x => x.nombre === el.dataset.nombre);
       if (!p) return;
-      const line = `${p.nombre} $ ${Math.round(p.ultimoPrecio)}`;
+      const n = countNumberedPlatos(menuBuilderState.text) + 1;
+      const line = `${n}) ${p.nombre} $ ${Math.round(p.ultimoPrecio)}`;
       let current = menuBuilderState.text;
       if (current && !/\n\s*\n$/.test(current)) {
         current = current.replace(/\n*$/, '') + '\n\n';
@@ -997,6 +1018,14 @@ function renderMenuBuilderView() {
       editor.focus();
     };
   });
+
+  const undoBtn = appEl.querySelector('#undoPlatoBtn');
+  if (undoBtn) undoBtn.onclick = () => {
+    undoLastPlato();
+    editor.value = menuBuilderState.text;
+    editor.scrollTop = editor.scrollHeight;
+    editor.focus();
+  };
 
   appEl.querySelector('#goPlatosFromBuilderBtn').onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); platosViewState = freshPlatosViewState(); renderAll(); };
   appEl.querySelector('#backToMenuFromBuilderBtn').onclick = () => { view = 'menu'; renderAll(); };
