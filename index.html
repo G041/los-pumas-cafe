@@ -969,9 +969,6 @@ function renderMenuBuilderView() {
       <div class="gate-title">Armado de menú del día</div>
       <div class="menu-builder-layout">
         <div class="menu-editor">
-          <div style="margin-bottom:6px;">
-            <button type="button" class="secondary" id="undoPlatoBtn" style="width:auto; padding:8px 14px;">↶ Deshacer</button>
-          </div>
           <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día...">${escapeHtml(menuBuilderState.text)}</textarea>
         </div>
         <div class="menu-search">
@@ -979,6 +976,7 @@ function renderMenuBuilderView() {
           <div class="plato-category-pills">${categoriaPillsHtml}</div>
           ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>`}
           ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">🍰 Postres disponibles</button>` : ''}
+          <button type="button" class="secondary" id="undoPlatoBtn" style="margin-top:auto;">↶ Deshacer</button>
         </div>
       </div>
       <div class="error">${menuBuilderState.error || ''}</div>
