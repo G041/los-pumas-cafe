@@ -361,6 +361,174 @@
     border: none;
     color: #ffffff;
   }
+
+  /* ---------- Dashboard ---------- */
+  #fitWrap.dashboard { max-width: 1360px; }
+  html.dash-mode { overflow-y: auto; height: auto; }
+  html.dash-mode body { overflow-y: auto; height: auto; }
+  html.dash-mode .viewport { height: auto; min-height: 100vh; align-items: flex-start; padding: 20px 12px 48px; }
+
+  .dashboard {
+    --viz-series-1: #2a78d6;
+    --viz-series-2: #eb6834;
+    --viz-series-3: #1baf7a;
+    --viz-series-4: #4a3aa7;
+    --viz-muted-bar: #d7dbe2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  :root[data-theme="dark"] .dashboard {
+    --viz-series-1: #3987e5;
+    --viz-series-2: #d95926;
+    --viz-series-3: #199e70;
+    --viz-series-4: #9085e9;
+    --viz-muted-bar: #2e333d;
+  }
+
+  .dash-hero {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 18px 22px;
+  }
+  .dash-hero img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; flex: none; }
+  .dash-hero-text { flex: 1; min-width: 200px; }
+  .dash-hero-greeting { font-size: 1.25rem; font-weight: 700; }
+  .dash-hero-sub { color: var(--muted); font-size: 0.92rem; margin-top: 2px; }
+  .dash-hero-status {
+    flex: none;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .dash-hero-status.ok { background: var(--done-bg); color: var(--ok); }
+  .dash-hero-status.pending { background: var(--input-bg); color: var(--muted); }
+  .dash-hero-status button { width: auto; padding: 9px 15px; font-size: 0.85rem; }
+
+  .dash-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .dash-kpi {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .dash-kpi-label { color: var(--muted); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .dash-kpi-value { font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .dash-kpi-delta { font-size: 0.82rem; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+  .dash-kpi-delta.up { color: var(--ok); }
+  .dash-kpi-delta.down { color: var(--danger); }
+  .dash-kpi-delta.flat { color: var(--muted); font-weight: 600; }
+
+  .dash-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .dash-grid { grid-template-columns: minmax(0, 1fr); } }
+
+  .dash-widget {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 18px 20px;
+    min-width: 0;
+  }
+  .dash-widget-title { font-size: 1.02rem; font-weight: 700; margin-bottom: 2px; }
+  .dash-widget-sub { color: var(--muted); font-size: 0.82rem; margin-bottom: 12px; }
+
+  .dash-actions { display: flex; flex-direction: column; gap: 10px; }
+  .dash-action-tile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+    background: var(--input-bg);
+    color: var(--text);
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .dash-action-icon {
+    flex: none;
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem;
+    color: #ffffff;
+  }
+
+  .dash-chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .dash-chart-wrap { position: relative; }
+  .dash-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.76rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+    transform: translate(-50%, -115%);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 5;
+  }
+  .dash-tooltip.visible { opacity: 1; }
+  .dash-tooltip .tt-date { color: var(--muted); font-size: 0.68rem; }
+  .dash-tooltip .tt-val { font-weight: 700; }
+
+  .dash-weekday-bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
+  .dash-weekday-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+  .dash-weekday-value, .dash-weekday-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .dash-weekday-value { font-size: 0.7rem; font-weight: 700; color: var(--muted); visibility: hidden; }
+  .dash-weekday-col.best .dash-weekday-value { color: var(--viz-series-1); visibility: visible; }
+  .dash-weekday-bar { width: 100%; max-width: 34px; border-radius: 8px 8px 3px 3px; background: var(--viz-muted-bar); min-height: 4px; }
+  .dash-weekday-col.best .dash-weekday-bar { background: var(--viz-series-1); }
+  .dash-weekday-label { font-size: 0.76rem; color: var(--muted); font-weight: 600; }
+  .dash-weekday-col.best .dash-weekday-label { color: var(--text); }
+
+  .dash-split-bar { display: flex; height: 30px; border-radius: 10px; overflow: hidden; background: var(--input-bg); gap: 2px; }
+  .dash-split-seg { display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 0.76rem; font-weight: 700; }
+  .dash-split-seg.cash { background: var(--viz-series-1); border-radius: 8px 0 0 8px; }
+  .dash-split-seg.card { background: var(--viz-series-2); border-radius: 0 8px 8px 0; }
+  .dash-split-legend { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
+  .dash-split-legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; }
+  .dash-split-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .dash-split-dot.cash { background: var(--viz-series-1); }
+  .dash-split-dot.card { background: var(--viz-series-2); }
+
+  table.dash-recent { width: 100%; border-collapse: collapse; }
+  table.dash-recent th, table.dash-recent td { text-align: right; padding: 7px 6px; font-size: 0.85rem; border-bottom: 1px solid var(--card-border); }
+  table.dash-recent th:first-child, table.dash-recent td:first-child { text-align: left; }
+  table.dash-recent th { color: var(--muted); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  table.dash-recent td.result-pos { color: var(--ok); font-weight: 700; }
+  table.dash-recent td.result-neg { color: var(--danger); font-weight: 700; }
+
+  .dash-empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 20px 0; }
+  .dash-link-btn { width: auto; flex: none; padding: 8px 12px; font-size: 0.82rem; }
 </style>
 </head>
 <body>
@@ -536,7 +704,7 @@ let platosViewState = null;
 function freshPlatosViewState() {
   return { search: '', confirmDelete: null, deleting: false, error: '' };
 }
-const PLATO_CATEGORIAS = ['Carne', 'Pollo', 'Cerdo', 'Pescado', 'Pasta', 'Arroz', 'Ensalada', 'Guarnición', 'Postre', 'Bebida'];
+const PLATO_CATEGORIAS = ['Carne', 'Pollo', 'Cerdo', 'Pescado', 'Pasta', 'Arroz', 'Ensalada', 'Guarnición', 'Postre', 'Bebida', 'Tartas'];
 function freshPlatoForm() {
   return { nombre: '', categoria: '', ultimoPrecio: '', editingNombre: null, error: '', saving: false };
 }
@@ -546,7 +714,16 @@ function freshMenuBuilderState() {
   return {
     text: '', search: '', categoriaFilter: '', confirmingNew: null, pendingUpdates: null, error: '', saving: false, success: false,
     postresModalOpen: false, selectedPostres: new Set(), postresWorking: null, lastPostresLine: '',
+    tartasModalOpen: false, selectedTartas: new Set(), tartasWorking: null, lastTartasLine: '',
   };
+}
+// Wraps each selected tart type in {} and joins them the way a spoken Spanish
+// list would: commas between all but the last, "o" before the last one.
+function joinTartaTypes(types) {
+  const braced = types.map(t => `{${t}}`);
+  if (braced.length === 0) return '';
+  if (braced.length === 1) return braced[0];
+  return braced.slice(0, -1).join(', ') + ' o ' + braced[braced.length - 1];
 }
 function normalizeName(s) {
   return String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -809,21 +986,314 @@ function buildRows() {
   return rows;
 }
 
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+function ymOf(dateISO) { return dateISO.slice(0, 7); }
+function prevYm(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function computeDashboardStats() {
+  const sorted = [...db].sort((a, b) => a.dateISO.localeCompare(b.dateISO));
+  const sum = (arr, key) => arr.reduce((a, r) => a + (Number(r[key]) || 0), 0);
+
+  const todayYm = isoToday().slice(0, 7);
+  const thisMonth = sorted.filter(r => ymOf(r.dateISO) === todayYm);
+  const lastMonth = sorted.filter(r => ymOf(r.dateISO) === prevYm(todayYm));
+
+  const ventasThisMonth = sum(thisMonth, 's3');
+  const ventasLastMonth = sum(lastMonth, 's3');
+  // Compare daily averages, not raw totals: the current month is almost always
+  // partial, so a totals comparison would look like a crash on day 2 of the month.
+  const avgThisMonth = thisMonth.length > 0 ? ventasThisMonth / thisMonth.length : 0;
+  const avgLastMonth = lastMonth.length > 0 ? ventasLastMonth / lastMonth.length : 0;
+  const momPct = avgLastMonth > 0 ? ((avgThisMonth - avgLastMonth) / avgLastMonth * 100) : null;
+
+  const platosThisMonth = sum(thisMonth, 'platos');
+  const avgTicket = platosThisMonth > 0 ? Math.round(ventasThisMonth / platosThisMonth) : 0;
+  const fiscalThisMonth = sum(thisMonth, 'fiscal');
+
+  const cashThisMonth = sum(thisMonth, 'C');
+  const cardThisMonth = sum(thisMonth, 'V');
+  const ccTotal = cashThisMonth + cardThisMonth;
+  const cashPct = ccTotal > 0 ? Math.round(cashThisMonth / ccTotal * 100) : 0;
+  const cardPct = ccTotal > 0 ? 100 - cashPct : 0;
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 29);
+  const cutoffIso = new Date(cutoff - cutoff.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const trend = sorted.filter(r => r.dateISO >= cutoffIso);
+
+  const weekdaySum = [0, 0, 0, 0, 0, 0, 0];
+  const weekdayCount = [0, 0, 0, 0, 0, 0, 0];
+  sorted.forEach(r => {
+    const jsDay = new Date(r.dateISO + 'T00:00:00').getDay();
+    const idx = (jsDay + 6) % 7; // Mon=0 .. Sun=6
+    weekdaySum[idx] += r.s3;
+    weekdayCount[idx] += 1;
+  });
+  const weekdayAvg = weekdaySum.map((s, i) => weekdayCount[i] ? s / weekdayCount[i] : 0);
+  const hasWeekdayData = weekdayCount.some(c => c > 0);
+  let bestIdx = 0;
+  weekdayAvg.forEach((v, i) => { if (v > weekdayAvg[bestIdx]) bestIdx = i; });
+
+  const recent = sorted.slice(-6).reverse();
+
+  return {
+    hasAnyData: sorted.length > 0,
+    ventasThisMonth, momPct, platosThisMonth, avgTicket, fiscalThisMonth,
+    cashThisMonth, cardThisMonth, cashPct, cardPct, ccTotal,
+    trend, weekdayAvg, bestIdx, hasWeekdayData, recent,
+  };
+}
+
+function buildSalesTrendChart(trend) {
+  const w = 640, h = 220, padL = 46, padR = 10, padT = 14, padB = 26;
+  const innerW = w - padL - padR, innerH = h - padT - padB;
+  const n = trend.length;
+  const values = trend.map(r => r.s3);
+  const maxVal = Math.max(...values, 1) * 1.15;
+
+  const points = trend.map((r, i) => {
+    const x = n === 1 ? padL + innerW / 2 : padL + (i / (n - 1)) * innerW;
+    const y = padT + innerH - (r.s3 / maxVal) * innerH;
+    return { x, y, dateISO: r.dateISO, value: r.s3 };
+  });
+  const baseline = padT + innerH;
+  const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  const areaPath = `${linePath} L${points[n - 1].x.toFixed(1)},${baseline.toFixed(1)} L${points[0].x.toFixed(1)},${baseline.toFixed(1)} Z`;
+
+  const gridLines = [0.25, 0.5, 0.75].map(f => {
+    const y = padT + innerH * (1 - f);
+    const val = Math.round(maxVal * f);
+    return `<line x1="${padL}" x2="${w - padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--card-border)" stroke-width="1" stroke-dasharray="3,4"/>
+      <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--muted)">${fmt(val)}</text>`;
+  }).join('');
+
+  const labelIdxs = [...new Set(n > 1 ? [0, Math.floor((n - 1) / 2), n - 1] : [0])];
+  const xLabels = labelIdxs.map(i => {
+    const p = points[i];
+    return `<text x="${p.x.toFixed(1)}" y="${h - 6}" font-size="10" text-anchor="middle" fill="var(--muted)">${toDisplayDate(trend[i].dateISO).slice(0, 5)}</text>`;
+  }).join('');
+
+  const html = `
+    <svg class="dash-chart-svg" viewBox="0 0 ${w} ${h}">
+      <defs>
+        <linearGradient id="dashAreaFade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--viz-series-1)" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="var(--viz-series-1)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${gridLines}
+      <line x1="${padL}" x2="${w - padR}" y1="${baseline.toFixed(1)}" y2="${baseline.toFixed(1)}" stroke="var(--card-border)" stroke-width="1"/>
+      <path d="${areaPath}" fill="url(#dashAreaFade)" stroke="none"/>
+      <path d="${linePath}" fill="none" stroke="var(--viz-series-1)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      <line class="dash-crosshair" x1="0" x2="0" y1="${padT}" y2="${baseline.toFixed(1)}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3,3" style="opacity:0;"/>
+      <circle class="dash-hover-dot" r="4.5" fill="var(--viz-series-1)" stroke="var(--card)" stroke-width="2" style="opacity:0;"/>
+      ${xLabels}
+    </svg>`;
+  return { html, points, w, h };
+}
+
+function wireTrendChartHover(wrapEl, chart) {
+  const svg = wrapEl.querySelector('svg');
+  const tooltip = wrapEl.querySelector('.dash-tooltip');
+  const crosshair = svg.querySelector('.dash-crosshair');
+  const dot = svg.querySelector('.dash-hover-dot');
+  const points = chart.points;
+  if (!svg || !points.length) return;
+
+  const showPoint = (nearest) => {
+    crosshair.setAttribute('x1', nearest.x);
+    crosshair.setAttribute('x2', nearest.x);
+    crosshair.style.opacity = 1;
+    dot.setAttribute('cx', nearest.x);
+    dot.setAttribute('cy', nearest.y);
+    dot.style.opacity = 1;
+    tooltip.querySelector('.tt-date').textContent = toDisplayDate(nearest.dateISO);
+    tooltip.querySelector('.tt-val').textContent = '$ ' + fmt(nearest.value);
+    tooltip.style.left = (nearest.x / chart.w * 100) + '%';
+    tooltip.style.top = (nearest.y / chart.h * 100) + '%';
+    tooltip.classList.add('visible');
+  };
+
+  svg.addEventListener('mousemove', (e) => {
+    const rect = svg.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    const svgX = (relX / rect.width) * chart.w;
+    let nearest = points[0], bestDist = Infinity;
+    points.forEach(p => { const d = Math.abs(p.x - svgX); if (d < bestDist) { bestDist = d; nearest = p; } });
+    showPoint(nearest);
+  });
+  svg.addEventListener('mouseleave', () => {
+    crosshair.style.opacity = 0;
+    dot.style.opacity = 0;
+    tooltip.classList.remove('visible');
+  });
+}
+
 function renderMenu() {
   dateBarEl.innerHTML = '';
   stepperEl.innerHTML = '';
+
+  if (!db || !db.length) {
+    appEl.innerHTML = `
+      <div class="dashboard">
+        <div class="dash-hero">
+          <img src="logo_circular.png" alt="Los Pumas Cafe">
+          <div class="dash-hero-text">
+            <div class="dash-hero-greeting">¿Qué querés hacer, Fabian?</div>
+            <div class="dash-hero-sub">Todavía no hay cierres cargados: el panel de estadísticas va a aparecer apenas cargues el primer día.</div>
+          </div>
+        </div>
+        <div class="dash-widget">
+          <div class="dash-actions">
+            <button class="dash-action-tile" id="goCierre"><span class="dash-action-icon" style="background:var(--viz-series-1);">💰</span> Sistema de cierre de caja</button>
+            <button class="dash-action-tile" id="goFacturacion"><span class="dash-action-icon" style="background:var(--viz-series-3);">📊</span> Ver facturación de Los Pumas Cafe</button>
+            <button class="dash-action-tile" id="goMenuBuilder"><span class="dash-action-icon" style="background:var(--viz-series-2);">📋</span> Armar menú del día</button>
+          </div>
+        </div>
+      </div>`;
+    wireDashboardActions();
+    return;
+  }
+
+  const s = computeDashboardStats();
+  const todayRecord = db.find(r => r.dateISO === isoToday());
+
+  const momHtml = s.momPct === null
+    ? `<div class="dash-kpi-delta flat">Primer mes con datos</div>`
+    : `<div class="dash-kpi-delta ${s.momPct > 0 ? 'up' : (s.momPct < 0 ? 'down' : 'flat')}">${s.momPct > 0 ? '↑' : (s.momPct < 0 ? '↓' : '—')} ${Math.abs(s.momPct).toFixed(1)}% promedio diario vs mes anterior</div>`;
+
+  const chart = s.trend.length ? buildSalesTrendChart(s.trend) : null;
+
+  const weekdayBarsHtml = s.hasWeekdayData ? (() => {
+    const maxAvg = Math.max(...s.weekdayAvg, 1);
+    return s.weekdayAvg.map((v, i) => `
+      <div class="dash-weekday-col ${i === s.bestIdx ? 'best' : ''}">
+        <div class="dash-weekday-value">$ ${fmt(Math.round(v))}</div>
+        <div class="dash-weekday-bar" style="height:${Math.max(4, (v / maxAvg) * 100)}%;"></div>
+        <div class="dash-weekday-label">${WEEKDAY_LABELS[i]}</div>
+      </div>`).join('');
+  })() : '';
+
+  const recentRowsHtml = s.recent.map(r => `
+    <tr>
+      <td>${toDisplayDate(r.dateISO)}</td>
+      <td>$ ${fmt(r.s3)}</td>
+      <td class="${r.final >= 0 ? 'result-pos' : 'result-neg'}">$ ${fmt(r.final)}</td>
+      <td>${r.platos}</td>
+    </tr>`).join('');
+
   appEl.innerHTML = `
-    <div class="card">
-      <div class="gate-title">¿Qué querés hacer, Fabian?</div>
-      <div class="menu-buttons">
-        <button id="goCierre">Sistema de cierre de caja</button>
-        <button class="secondary" id="goFacturacion">Ver facturación de Los Pumas Cafe</button>
-        <button class="secondary" id="goMenuBuilder">Armar menú del día</button>
+    <div class="dashboard">
+      <div class="dash-hero">
+        <img src="logo_circular.png" alt="Los Pumas Cafe">
+        <div class="dash-hero-text">
+          <div class="dash-hero-greeting">Hola, Fabian 👋</div>
+          <div class="dash-hero-sub">Este es el panel de Los Pumas Cafe. Acá tenés un resumen de cómo viene el negocio.</div>
+        </div>
+        ${todayRecord
+          ? `<div class="dash-hero-status ok">✔ Cierre de hoy cargado — $ ${fmt(todayRecord.s3)}</div>`
+          : `<div class="dash-hero-status pending">Todavía no cargaste el cierre de hoy <button id="heroGoCierre">Cargar cierre</button></div>`}
+      </div>
+
+      <div class="dash-kpis">
+        <div class="dash-kpi">
+          <div class="dash-kpi-label">Ventas del mes</div>
+          <div class="dash-kpi-value">$ ${fmt(s.ventasThisMonth)}</div>
+          ${momHtml}
+        </div>
+        <div class="dash-kpi">
+          <div class="dash-kpi-label">Ticket promedio por plato</div>
+          <div class="dash-kpi-value">$ ${fmt(s.avgTicket)}</div>
+          <div class="dash-kpi-delta flat">${s.platosThisMonth} platos vendidos</div>
+        </div>
+        <div class="dash-kpi">
+          <div class="dash-kpi-label">Platos vendidos</div>
+          <div class="dash-kpi-value">${s.platosThisMonth}</div>
+          <div class="dash-kpi-delta flat">este mes</div>
+        </div>
+        <div class="dash-kpi">
+          <div class="dash-kpi-label">Total fiscal del mes</div>
+          <div class="dash-kpi-value">$ ${fmt(s.fiscalThisMonth)}</div>
+          <div class="dash-kpi-delta flat">declarado</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-widget">
+          <div class="dash-widget-title">Resumen de ventas</div>
+          <div class="dash-widget-sub">Últimos ${s.trend.length} días con cierre cargado</div>
+          ${chart ? `<div class="dash-chart-wrap">${chart.html}<div class="dash-tooltip"><div class="tt-date"></div><div class="tt-val"></div></div></div>` : `<div class="dash-empty">Todavía no hay suficientes datos para el gráfico.</div>`}
+        </div>
+        <div class="dash-widget">
+          <div class="dash-widget-title">Accesos rápidos</div>
+          <div class="dash-actions">
+            <button class="dash-action-tile" id="goCierre"><span class="dash-action-icon" style="background:var(--viz-series-1);">💰</span> Cierre de caja</button>
+            <button class="dash-action-tile" id="goFacturacion"><span class="dash-action-icon" style="background:var(--viz-series-3);">📊</span> Facturación</button>
+            <button class="dash-action-tile" id="goMenuBuilder"><span class="dash-action-icon" style="background:var(--viz-series-2);">📋</span> Armar menú del día</button>
+            <button class="dash-action-tile" id="goPlatos"><span class="dash-action-icon" style="background:var(--viz-series-4);">🍽️</span> Gestionar platos</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-widget">
+          <div class="dash-widget-title">Mejor día de la semana</div>
+          <div class="dash-widget-sub">Promedio de ventas por día, todo el histórico</div>
+          ${s.hasWeekdayData ? `<div class="dash-weekday-bars">${weekdayBarsHtml}</div>` : `<div class="dash-empty">Todavía no hay suficientes datos.</div>`}
+        </div>
+        <div class="dash-widget">
+          <div class="dash-widget-title">Efectivo vs Tarjeta</div>
+          <div class="dash-widget-sub">Este mes</div>
+          ${s.ccTotal > 0 ? `
+            <div class="dash-split-bar">
+              <div class="dash-split-seg cash" style="flex:${s.cashPct};">${s.cashPct >= 12 ? s.cashPct + '%' : ''}</div>
+              <div class="dash-split-seg card" style="flex:${s.cardPct};">${s.cardPct >= 12 ? s.cardPct + '%' : ''}</div>
+            </div>
+            <div class="dash-split-legend">
+              <div class="dash-split-legend-item"><span class="dash-split-dot cash"></span>Efectivo — $ ${fmt(s.cashThisMonth)}</div>
+              <div class="dash-split-legend-item"><span class="dash-split-dot card"></span>Tarjeta — $ ${fmt(s.cardThisMonth)}</div>
+            </div>` : `<div class="dash-empty">Todavía no hay ventas este mes.</div>`}
+        </div>
+      </div>
+
+      <div class="dash-widget">
+        <div class="dash-widget-title">Últimos cierres</div>
+        <table class="dash-recent">
+          <thead><tr><th>Fecha</th><th>Ventas</th><th>Resultado</th><th>Platos</th></tr></thead>
+          <tbody>${recentRowsHtml}</tbody>
+        </table>
+        <div class="controls" style="margin-top:12px;">
+          <button class="secondary dash-link-btn" id="goFacturacionFromRecent">Ver facturación completa →</button>
+        </div>
       </div>
     </div>`;
-  appEl.querySelector('#goCierre').onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
-  appEl.querySelector('#goFacturacion').onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
-  appEl.querySelector('#goMenuBuilder').onclick = () => { view = 'menuBuilder'; if (!menuBuilderState) menuBuilderState = freshMenuBuilderState(); renderAll(); };
+
+  wireDashboardActions();
+  const heroBtn = appEl.querySelector('#heroGoCierre');
+  if (heroBtn) heroBtn.onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
+  const recentLink = appEl.querySelector('#goFacturacionFromRecent');
+  if (recentLink) recentLink.onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
+
+  if (chart) {
+    const wrap = appEl.querySelector('.dash-chart-wrap');
+    if (wrap) wireTrendChartHover(wrap, chart);
+  }
+}
+
+function wireDashboardActions() {
+  const goCierre = appEl.querySelector('#goCierre');
+  const goFacturacion = appEl.querySelector('#goFacturacion');
+  const goMenuBuilder = appEl.querySelector('#goMenuBuilder');
+  const goPlatos = appEl.querySelector('#goPlatos');
+  if (goCierre) goCierre.onclick = () => { view = 'cierre'; state = freshState(); renderAll(); };
+  if (goFacturacion) goFacturacion.onclick = () => { view = 'facturacion'; facturacionMonth = null; renderAll(); };
+  if (goMenuBuilder) goMenuBuilder.onclick = () => { view = 'menuBuilder'; if (!menuBuilderState) menuBuilderState = freshMenuBuilderState(); renderAll(); };
+  if (goPlatos) goPlatos.onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); platosViewState = freshPlatosViewState(); renderAll(); };
 }
 
 function renderPlatosView() {
@@ -981,7 +1451,7 @@ function renderMenuBuilderView() {
   const q = normalizeName(menuBuilderState.search);
   const cat = menuBuilderState.categoriaFilter;
   const active = !!(q || cat);
-  const pool = platosDb.filter(p => p.categoria !== 'Postre');
+  const pool = platosDb.filter(p => p.categoria !== 'Postre' && p.categoria !== 'Tartas');
   let results = [];
   if (active) {
     results = pool
@@ -997,7 +1467,7 @@ function renderMenuBuilderView() {
           <div class="plato-search-meta">${escapeHtml(p.categoria)} · Últ. uso ${toDisplayDate(p.ultimaFecha)} · $ ${fmt(p.ultimoPrecio)}</div>
         </div>`).join('') : `<div class="plato-search-empty">Sin resultados</div>`}</div>`;
 
-  const categoriaPillsHtml = PLATO_CATEGORIAS.filter(c => c !== 'Postre').map(c =>
+  const categoriaPillsHtml = PLATO_CATEGORIAS.filter(c => c !== 'Postre' && c !== 'Tartas').map(c =>
     `<div class="month-tab plato-cat-pill ${cat === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</div>`
   ).join('');
 
@@ -1017,6 +1487,8 @@ function renderMenuBuilderView() {
           <div class="plato-category-pills">${categoriaPillsHtml}</div>
           ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>`}
           ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">🍰 Postres disponibles</button>` : ''}
+          ${active ? '' : `<button type="button" class="postres-btn" id="tartasBtn">🥧 Tartas disponibles</button>`}
+          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="tartasBtn">🥧 Tartas disponibles</button>` : ''}
           <button type="button" class="secondary" id="undoPlatoBtn" style="margin-top:auto;">↶ Deshacer</button>
         </div>
       </div>
@@ -1508,6 +1980,10 @@ function downloadCSV() {
 }
 
 function fitToViewport() {
+  if (view === 'menu') {
+    fitWrapEl.style.transform = 'none';
+    return;
+  }
   fitWrapEl.style.transform = 'scale(1)';
   const availH = window.innerHeight - 24;
   const availW = window.innerWidth - 24;
@@ -1546,6 +2022,8 @@ function renderAll() {
   }
   fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos');
   fitWrapEl.classList.toggle('menu-wide', view === 'menuBuilder');
+  fitWrapEl.classList.toggle('dashboard', view === 'menu');
+  document.documentElement.classList.toggle('dash-mode', view === 'menu');
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
