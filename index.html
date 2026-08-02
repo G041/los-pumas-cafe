@@ -81,6 +81,19 @@
   #fitWrap.wide { max-width: 900px; }
   #fitWrap.menu-wide { max-width: 1200px; }
 
+  /* ---------- Screen change: Slide + Fade + Stagger ---------- */
+  @keyframes screenSlideFadeIn {
+    from { opacity: 0; transform: translateX(28px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .screen-enter { animation: screenSlideFadeIn .5s cubic-bezier(.4,0,.2,1); }
+
+  @keyframes staggerChildIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .stagger-child { animation: staggerChildIn .45s ease both; }
+
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
   .subtitle { color: var(--muted); font-size: 1rem; }
@@ -184,8 +197,10 @@
     color: var(--accent-text);
     cursor: pointer;
     flex: 1;
+    transition: transform .2s ease, box-shadow .2s ease;
   }
   button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 0 0 3px rgba(62, 179, 238, 0.35); }
   button.secondary { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
   button.link-btn { background: none; border: none; color: var(--accent); font-size: 0.95rem; width: auto; padding: 4px; flex: none; }
 
@@ -588,6 +603,31 @@ async function login(password, remember) {
 }
 let view = 'menu'; // 'menu' | 'cierre' | 'facturacion'
 let facturacionMonth = null;
+let lastScreenKey = null;
+
+function screenKeyFor() {
+  if (authStatus !== 'ready') return 'gate:' + authStatus;
+  if (state.saved) return 'saved';
+  return 'view:' + view;
+}
+
+function playScreenTransition() {
+  [dateBarEl, stepperEl, appEl].forEach(el => {
+    if (!el || !el.firstElementChild) return;
+    el.classList.remove('screen-enter');
+    void el.offsetWidth;
+    el.classList.add('screen-enter');
+  });
+  const root = appEl.firstElementChild;
+  if (root) {
+    Array.from(root.children).forEach((child, i) => {
+      child.classList.remove('stagger-child');
+      child.style.animationDelay = (i * 0.06) + 's';
+    });
+    void root.offsetWidth;
+    Array.from(root.children).forEach(child => child.classList.add('stagger-child'));
+  }
+}
 
 const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 function monthLabel(ym) {
@@ -1993,6 +2033,9 @@ function fitToViewport() {
 }
 
 function renderAll() {
+  const screenKey = screenKeyFor();
+  const screenChanged = screenKey !== lastScreenKey;
+  lastScreenKey = screenKey;
   document.getElementById('logoutBtn').style.display = authStatus === 'ready' ? '' : 'none';
   if (authStatus !== 'ready') {
     dateBarEl.innerHTML = '';
@@ -2017,6 +2060,7 @@ function renderAll() {
     gateBtn.onclick = submit;
     gateInput.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     if (!checking) gateInput.focus();
+    if (screenChanged) playScreenTransition();
     requestAnimationFrame(fitToViewport);
     return;
   }
@@ -2037,6 +2081,7 @@ function renderAll() {
     renderStepper();
     renderApp();
   }
+  if (screenChanged) playScreenTransition();
   requestAnimationFrame(fitToViewport);
 }
 
