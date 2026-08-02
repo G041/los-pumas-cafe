@@ -86,13 +86,13 @@
     from { opacity: 0; transform: translateX(28px); }
     to { opacity: 1; transform: translateX(0); }
   }
-  .screen-enter { animation: screenSlideFadeIn .7s cubic-bezier(.4,0,.2,1); }
+  .screen-enter { animation: screenSlideFadeIn .9s cubic-bezier(.4,0,.2,1); }
 
   @keyframes staggerChildIn {
     from { opacity: 0; transform: translateY(14px); }
     to { opacity: 1; transform: translateY(0); }
   }
-  .stagger-child { animation: staggerChildIn .6s ease both; }
+  .stagger-child { animation: staggerChildIn .8s ease both; }
 
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
@@ -197,7 +197,7 @@
     color: var(--accent-text);
     cursor: pointer;
     flex: 1;
-    transition: transform .2s ease, box-shadow .2s ease;
+    transition: transform .26s ease, box-shadow .26s ease;
   }
   button:disabled { opacity: 0.35; cursor: not-allowed; }
   button:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 0 0 3px rgba(62, 179, 238, 0.35); }
@@ -622,7 +622,7 @@ function playScreenTransition() {
   if (root) {
     Array.from(root.children).forEach((child, i) => {
       child.classList.remove('stagger-child');
-      child.style.animationDelay = (i * 0.1) + 's';
+      child.style.animationDelay = (i * 0.13) + 's';
     });
     void root.offsetWidth;
     Array.from(root.children).forEach(child => child.classList.add('stagger-child'));
@@ -1540,7 +1540,8 @@ function renderMenuBuilderView() {
         <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
       </div>
     </div>
-    ${menuBuilderState.postresModalOpen ? renderPostresModalHtml() : ''}`;
+    ${menuBuilderState.postresModalOpen ? renderPostresModalHtml() : ''}
+    ${menuBuilderState.tartasModalOpen ? renderTartasModalHtml() : ''}`;
 
   const editor = appEl.querySelector('#menuEditor');
   editor.oninput = (e) => { menuBuilderState.text = e.target.value; };
@@ -1598,6 +1599,15 @@ function renderMenuBuilderView() {
   };
 
   if (menuBuilderState.postresModalOpen) wirePostresModal();
+
+  const tartasBtn = appEl.querySelector('#tartasBtn');
+  if (tartasBtn) tartasBtn.onclick = () => {
+    menuBuilderState.tartasWorking = new Set(menuBuilderState.selectedTartas);
+    menuBuilderState.tartasModalOpen = true;
+    renderAll();
+  };
+
+  if (menuBuilderState.tartasModalOpen) wireTartasModal();
 }
 
 function renderPostresModalHtml() {
@@ -1662,6 +1672,96 @@ function wirePostresModal() {
     menuBuilderState.lastPostresLine = line;
     menuBuilderState.postresModalOpen = false;
     menuBuilderState.postresWorking = null;
+    renderAll();
+    const editor = appEl.querySelector('#menuEditor');
+    if (editor) { editor.scrollTop = editor.scrollHeight; editor.focus(); }
+  };
+}
+
+// "Tartas del día" is a template item, not a selectable flavor - it only
+// exists to carry the composite line's price (like any other plato).
+function renderTartasModalHtml() {
+  const tartas = platosDb
+    .filter(p => p.categoria === 'Tartas' && p.nombre !== 'Tartas del día')
+    .slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+  const cols = Math.max(1, Math.ceil(tartas.length / 3));
+  const working = menuBuilderState.tartasWorking || new Set();
+  const chipsHtml = tartas.map(p => `
+    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</div>
+  `).join('');
+
+  return `
+    <div class="postres-modal-overlay" id="tartasOverlay">
+      <div class="postres-modal">
+        <div class="gate-title" style="margin-bottom:0;">Tartas disponibles</div>
+        <div class="postres-grid" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
+        <div class="controls">
+          <button class="secondary" id="tartasCancelBtn">Cancelar</button>
+          <button id="tartasConfirmBtn">Confirmar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function wireTartasModal() {
+  const overlay = appEl.querySelector('#tartasOverlay');
+  if (!overlay) return;
+
+  overlay.querySelectorAll('.postre-chip').forEach(el => {
+    el.onclick = () => {
+      const nombre = el.dataset.nombre;
+      const working = menuBuilderState.tartasWorking;
+      if (working.has(nombre)) working.delete(nombre); else working.add(nombre);
+      renderAll();
+    };
+  });
+
+  overlay.querySelector('#tartasCancelBtn').onclick = () => {
+    menuBuilderState.tartasModalOpen = false;
+    menuBuilderState.tartasWorking = null;
+    renderAll();
+  };
+
+  overlay.querySelector('#tartasConfirmBtn').onclick = () => {
+    menuBuilderState.selectedTartas = new Set(menuBuilderState.tartasWorking);
+    const tipos = platosDb
+      .filter(p => p.categoria === 'Tartas' && p.nombre !== 'Tartas del día' && menuBuilderState.selectedTartas.has(p.nombre))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre))
+      .map(p => p.nombre);
+    const joined = joinTartaTypes(tipos);
+
+    let body = '';
+    if (joined) {
+      const plantilla = findPlatoByName('Tartas del día');
+      const precio = plantilla ? Math.round(plantilla.ultimoPrecio) : 0;
+      body = `Tartas del día: ${joined} con Ensalada. $ ${precio}`;
+    }
+
+    let current = menuBuilderState.text;
+    let newLine = '';
+    if (body) {
+      let num = null;
+      if (menuBuilderState.lastTartasLine && current.includes(menuBuilderState.lastTartasLine)) {
+        const m = menuBuilderState.lastTartasLine.match(/^(\d+)\)/);
+        if (m) num = m[1];
+      }
+      if (num === null) num = countNumberedPlatos(current) + 1;
+      newLine = `${num}) ${body}`;
+    }
+
+    if (menuBuilderState.lastTartasLine && current.includes(menuBuilderState.lastTartasLine)) {
+      current = current.replace(menuBuilderState.lastTartasLine, newLine);
+      if (!newLine) current = current.replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+    } else if (newLine) {
+      if (current && !/\n\s*\n$/.test(current)) {
+        current = current.replace(/\n*$/, '') + '\n\n';
+      }
+      current = current + newLine + '\n\n';
+    }
+    menuBuilderState.text = current;
+    menuBuilderState.lastTartasLine = newLine;
+    menuBuilderState.tartasModalOpen = false;
+    menuBuilderState.tartasWorking = null;
     renderAll();
     const editor = appEl.querySelector('#menuEditor');
     if (editor) { editor.scrollTop = editor.scrollHeight; editor.focus(); }
