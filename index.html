@@ -572,7 +572,7 @@ const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
 const SESSION_STORAGE_KEY = 'lospumas_session_token';
 
 let sessionToken = localStorage.getItem(SESSION_STORAGE_KEY) || '';
-let authStatus = 'gate'; // 'gate' | 'checking' | 'ready'
+let authStatus = 'gate'; // 'gate' | 'checking' | 'resuming' | 'ready'
 let authError = '';
 let rememberMe = true;
 
@@ -2137,6 +2137,14 @@ function renderAll() {
   const screenChanged = screenKey !== lastScreenKey;
   lastScreenKey = screenKey;
   document.getElementById('logoutBtn').style.display = authStatus === 'ready' ? '' : 'none';
+  if (authStatus === 'resuming') {
+    dateBarEl.innerHTML = '';
+    stepperEl.innerHTML = '';
+    appEl.innerHTML = `<div class="card"><div class="gate-title">Cargando…</div></div>`;
+    if (screenChanged) playScreenTransition();
+    requestAnimationFrame(fitToViewport);
+    return;
+  }
   if (authStatus !== 'ready') {
     dateBarEl.innerHTML = '';
     stepperEl.innerHTML = '';
@@ -2232,7 +2240,7 @@ function logout() {
 
 async function tryResumeSession() {
   if (!sessionToken) return;
-  authStatus = 'checking';
+  authStatus = 'resuming';
   renderAll();
   try {
     [db, platosDb] = await Promise.all([fetchData(), fetchPlatos()]);
