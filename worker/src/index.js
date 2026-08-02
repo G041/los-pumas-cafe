@@ -9,7 +9,7 @@ function corsHeaders(env) {
   return {
     'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-App-Password',
+    'Access-Control-Allow-Headers': 'Content-Type, X-App-Password, X-Session-Token',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -45,8 +45,9 @@ function getClientIP(request) {
 
 // Returns a Response to send back immediately if the request should be
 // blocked (locked out or wrong password), or null if the password was correct
-// and the caller should proceed.
-async function checkAuth(request, env) {
+// and the caller should proceed. Only /api/login uses this - the real
+// password never travels with any other request.
+async function checkPasswordAuth(request, env) {
   const ip = getClientIP(request);
   const lockKey = `ratelimit:lock:${ip}`;
   const failsKey = `ratelimit:fails:${ip}`;
@@ -70,6 +71,75 @@ async function checkAuth(request, env) {
   }
 
   return json(env, 401, { ok: false, error: 'bad_password' });
+}
+
+// Session tokens are HMAC-signed {exp} payloads, not looked up anywhere -
+// so verifying one costs no KV read. Rotating SESSION_SECRET invalidates
+// every outstanding session at once (e.g. if a device is lost).
+const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // ~7 days
+
+function base64url(bytes) {
+  let str = '';
+  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlToBytes(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function getSessionKey(env) {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(env.SESSION_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+async function createSessionToken(env) {
+  const exp = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
+  const payloadB64 = base64url(new TextEncoder().encode(JSON.stringify({ exp })));
+  const key = await getSessionKey(env);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadB64));
+  return `${payloadB64}.${base64url(new Uint8Array(sig))}`;
+}
+
+async function verifySessionToken(token, env) {
+  if (typeof token !== 'string' || !token) return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  let sigBytes, payload;
+  try {
+    sigBytes = base64urlToBytes(parts[1]);
+    payload = JSON.parse(new TextDecoder().decode(base64urlToBytes(parts[0])));
+  } catch (e) {
+    return false;
+  }
+  const key = await getSessionKey(env);
+  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(parts[0]));
+  if (!valid) return false;
+  return typeof payload.exp === 'number' && payload.exp > Math.floor(Date.now() / 1000);
+}
+
+// Gate for every endpoint except /api/login.
+async function checkSession(request, env) {
+  const token = request.headers.get('X-Session-Token') || '';
+  if (await verifySessionToken(token, env)) return null;
+  return json(env, 401, { ok: false, error: 'invalid_session' });
+}
+
+async function handleLogin(request, env) {
+  const denied = await checkPasswordAuth(request, env);
+  if (denied) return denied;
+  const token = await createSessionToken(env);
+  return json(env, 200, { ok: true, token, expiresIn: SESSION_TTL_SECONDS });
 }
 
 function isPositiveNumber(n) {
@@ -161,14 +231,14 @@ function serializePlatosCSV(rows) {
 }
 
 async function handleGetData(request, env) {
-  const denied = await checkAuth(request, env);
+  const denied = await checkSession(request, env);
   if (denied) return denied;
   const csv = (await env.DB.get(DB_KEY)) ?? (CSV_HEADER + '\n');
   return json(env, 200, { ok: true, csv });
 }
 
 async function handleSave(request, env) {
-  const denied = await checkAuth(request, env);
+  const denied = await checkSession(request, env);
   if (denied) return denied;
 
   let body;
@@ -203,14 +273,14 @@ async function handleSave(request, env) {
 }
 
 async function handleGetPlatos(request, env) {
-  const denied = await checkAuth(request, env);
+  const denied = await checkSession(request, env);
   if (denied) return denied;
   const csv = (await env.DB.get(PLATOS_DB_KEY)) ?? (PLATOS_CSV_HEADER + '\n');
   return json(env, 200, { ok: true, csv });
 }
 
 async function handleSavePlato(request, env) {
-  const denied = await checkAuth(request, env);
+  const denied = await checkSession(request, env);
   if (denied) return denied;
 
   let body;
@@ -238,7 +308,7 @@ async function handleSavePlato(request, env) {
 }
 
 async function handleDeletePlato(request, env) {
-  const denied = await checkAuth(request, env);
+  const denied = await checkSession(request, env);
   if (denied) return denied;
 
   let body;
@@ -270,6 +340,10 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(env) });
     }
 
+    if (url.pathname === '/api/login' && request.method === 'POST') {
+      return handleLogin(request, env);
+    }
+
     if (url.pathname === '/api/data' && request.method === 'GET') {
       return handleGetData(request, env);
     }
@@ -290,7 +364,7 @@ export default {
       return handleDeletePlato(request, env);
     }
 
-    const knownPaths = ['/api/data', '/api/save', '/api/platos', '/api/platos/save', '/api/platos/delete'];
+    const knownPaths = ['/api/login', '/api/data', '/api/save', '/api/platos', '/api/platos/save', '/api/platos/delete'];
     if (!knownPaths.includes(url.pathname)) {
       return json(env, 404, { ok: false, error: 'not_found' });
     }

@@ -362,6 +362,7 @@
         <div class="subtitle">Cierre diario de Fabian</div>
       </div>
       <div style="display:flex; gap:8px;">
+        <button class="history-toggle" id="logoutBtn" type="button" style="display:none;">🔒 Salir</button>
         <button class="history-toggle theme-toggle" id="themeToggleBtn" type="button">🌙</button>
         <button class="history-toggle" id="menuBtn">☰ Menú</button>
       </div>
@@ -375,10 +376,34 @@
 
 <script>
 const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
+const SESSION_STORAGE_KEY = 'lospumas_session_token';
 
-let appPassword = '';
+let sessionToken = localStorage.getItem(SESSION_STORAGE_KEY) || '';
 let authStatus = 'gate'; // 'gate' | 'checking' | 'ready'
 let authError = '';
+
+function storeSessionToken(token) {
+  sessionToken = token;
+  try { localStorage.setItem(SESSION_STORAGE_KEY, token); } catch (e) {}
+}
+function clearSessionToken() {
+  sessionToken = '';
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) {}
+}
+
+async function login(password) {
+  const res = await fetch(WORKER_BASE + '/api/login', {
+    method: 'POST',
+    headers: { 'X-App-Password': password },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.error || ('HTTP ' + res.status));
+    err.code = data.error;
+    throw err;
+  }
+  storeSessionToken(data.token);
+}
 let view = 'menu'; // 'menu' | 'cierre' | 'facturacion'
 let facturacionMonth = null;
 
@@ -398,7 +423,7 @@ function groupByMonth() {
 
 async function fetchData() {
   const res = await fetch(WORKER_BASE + '/api/data', {
-    headers: { 'X-App-Password': appPassword },
+    headers: { 'X-Session-Token': sessionToken },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) {
@@ -464,7 +489,7 @@ function parsePlatosCSV(text) {
 }
 async function fetchPlatos() {
   const res = await fetch(WORKER_BASE + '/api/platos', {
-    headers: { 'X-App-Password': appPassword },
+    headers: { 'X-Session-Token': sessionToken },
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) {
@@ -578,7 +603,7 @@ async function executeMenuSave(updates) {
     for (const plato of updates) {
       const res = await fetch(WORKER_BASE + '/api/platos/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+        headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
         body: JSON.stringify({ plato }),
       });
       const data = await res.json().catch(() => ({}));
@@ -597,6 +622,7 @@ async function executeMenuSave(updates) {
     setTimeout(() => { menuBuilderState.success = false; renderAll(); }, 4000);
   } catch (e) {
     menuBuilderState.saving = false;
+    if (e.code === 'invalid_session') { logout(); return; }
     menuBuilderState.error = errorMessage(e.code);
     renderAll();
   }
@@ -906,12 +932,13 @@ async function deletePlato() {
   try {
     const res = await fetch(WORKER_BASE + '/api/platos/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
       body: JSON.stringify({ nombre }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
       platosViewState.deleting = false;
+      if (data.error === 'invalid_session') { logout(); return; }
       platosViewState.error = errorMessage(data.error);
       renderAll();
       return;
@@ -1180,12 +1207,13 @@ async function savePlato() {
   try {
     const res = await fetch(WORKER_BASE + '/api/platos/save', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
       body: JSON.stringify({ plato }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
       platoForm.saving = false;
+      if (data.error === 'invalid_session') { logout(); return; }
       platoForm.error = errorMessage(data.error);
       renderAll();
       return;
@@ -1361,6 +1389,8 @@ function onConfirm() {
 function errorMessage(code) {
   switch (code) {
     case 'bad_password': return 'Contraseña incorrecta.';
+    case 'invalid_session': return 'Tu sesión expiró. Volvé a ingresar la contraseña.';
+    case 'too_many_attempts': return 'Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.';
     case 'invalid_record': return 'Algún valor no es válido. Revisá los números e intentá de nuevo.';
     case 'invalid_plato': return 'Algún dato del plato no es válido. Revisá nombre, categoría y precio.';
     default: return 'No se pudo guardar. Revisá tu conexión e intentá de nuevo.';
@@ -1392,12 +1422,13 @@ async function trySave() {
   try {
     const res = await fetch(WORKER_BASE + '/api/save', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Password': appPassword },
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
       body: JSON.stringify({ record }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
       state.saving = false;
+      if (data.error === 'invalid_session') { logout(); return; }
       state.error = errorMessage(data.error);
       renderAll();
       return;
@@ -1472,6 +1503,7 @@ function fitToViewport() {
 }
 
 function renderAll() {
+  document.getElementById('logoutBtn').style.display = authStatus === 'ready' ? '' : 'none';
   if (authStatus !== 'ready') {
     dateBarEl.innerHTML = '';
     stepperEl.innerHTML = '';
@@ -1529,11 +1561,11 @@ document.getElementById('themeToggleBtn').onclick = () => {
 };
 
 async function submitPassword(pw) {
-  appPassword = pw;
   authStatus = 'checking';
   authError = '';
   renderAll();
   try {
+    await login(pw);
     [db, platosDb] = await Promise.all([fetchData(), fetchPlatos()]);
     authStatus = 'ready';
   } catch (e) {
@@ -1541,12 +1573,38 @@ async function submitPassword(pw) {
     if (e.code === 'bad_password') authError = 'Contraseña incorrecta.';
     else if (e.code === 'too_many_attempts') authError = 'Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.';
     else authError = 'No se pudo conectar. Intentá de nuevo.';
-    appPassword = '';
+    clearSessionToken();
   }
   renderAll();
 }
 
+function logout() {
+  clearSessionToken();
+  authStatus = 'gate';
+  authError = '';
+  db = null;
+  platosDb = null;
+  renderAll();
+}
+
+async function tryResumeSession() {
+  if (!sessionToken) return;
+  authStatus = 'checking';
+  renderAll();
+  try {
+    [db, platosDb] = await Promise.all([fetchData(), fetchPlatos()]);
+    authStatus = 'ready';
+  } catch (e) {
+    authStatus = 'gate';
+    clearSessionToken();
+  }
+  renderAll();
+}
+
+document.getElementById('logoutBtn').onclick = logout;
+
 renderAll();
+tryResumeSession();
 </script>
 </body>
 </html>
