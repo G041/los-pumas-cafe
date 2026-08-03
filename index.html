@@ -50,6 +50,16 @@
     --done-border: #1f5c40;
   }
   * { box-sizing: border-box; }
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   input[type=number]::-webkit-inner-spin-button,
   input[type=number]::-webkit-outer-spin-button {
     -webkit-appearance: none;
@@ -95,6 +105,7 @@
   .stagger-child { animation: staggerChildIn .8s ease both; }
 
   .top-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
+  .top-bar-actions { display: flex; gap: 8px; }
   h1 { font-size: 1.7rem; margin: 0 0 2px; }
   .subtitle { color: var(--muted); font-size: 1rem; }
   .history-toggle {
@@ -139,6 +150,13 @@
     overflow-x: auto;
     margin-bottom: 12px;
     padding-bottom: 4px;
+  }
+  .stepper-list {
+    display: flex;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
   .step-pill {
     flex: 0 0 auto;
@@ -228,7 +246,8 @@
     cursor: pointer;
   }
   .remember-me-label input { margin: 0; }
-  .gate-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 14px; text-align: center; }
+  .gate-title { font-size: 1.2rem; font-weight: 700; margin: 0 0 14px; text-align: center; }
+  .form-section-title { font-size: 1rem; font-weight: 700; margin: 14px 0 0; }
 
   .menu-buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
 
@@ -549,23 +568,24 @@
 <body>
 <div class="viewport">
   <div id="fitWrap">
-    <div class="top-bar">
+    <header class="top-bar">
       <div>
         <h1>Los Pumas Cafe</h1>
         <div class="subtitle">Cierre diario de Fabian</div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="history-toggle" id="logoutBtn" type="button" style="display:none;">🔒 Salir</button>
-        <button class="history-toggle theme-toggle" id="themeToggleBtn" type="button">🌙</button>
-        <button class="history-toggle" id="menuBtn">☰ Menú</button>
+      <div class="top-bar-actions">
+        <button class="history-toggle" id="logoutBtn" type="button" style="display:none;" aria-label="Cerrar sesión">🔒 Salir</button>
+        <button class="history-toggle theme-toggle" id="themeToggleBtn" type="button" aria-label="Cambiar tema claro u oscuro">🌙</button>
+        <button class="history-toggle" id="menuBtn" type="button" aria-label="Ir al inicio">☰ Menú</button>
       </div>
-    </div>
+    </header>
 
     <div id="dateBar" class="date-bar"></div>
-    <div id="stepper" class="stepper"></div>
-    <div id="app"></div>
+    <nav id="stepper" class="stepper" aria-label="Progreso del cierre diario"></nav>
+    <main id="app"></main>
   </div>
 </div>
+<div id="liveRegion" class="sr-only" role="status" aria-live="polite"></div>
 
 <script>
 const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
@@ -934,7 +954,7 @@ function renderDateBar() {
   dateBarEl.innerHTML = `
     <span>Cerrando el día <strong>${toDisplayDate(state.dateISO)}</strong></span>
     <button class="date-picker-btn" type="button" id="openDatePicker">📅 Cambiar fecha</button>
-    <input type="date" id="dateInput" class="hidden-date-input" value="${state.dateISO}" tabindex="-1">
+    <input type="date" id="dateInput" class="hidden-date-input" value="${state.dateISO}" tabindex="-1" aria-label="Fecha del cierre">
   `;
   const dateInput = dateBarEl.querySelector('#dateInput');
   dateBarEl.querySelector('#openDatePicker').onclick = () => {
@@ -953,10 +973,16 @@ function renderDateBar() {
 
 function renderStepper() {
   const labels = { C: 'C', V: 'V', F: 'F', T: 'T', opening: 'Apertura', platos: 'Platos', fiscal: 'Fiscal' };
-  stepperEl.innerHTML = STEPS.map((key, i) => {
-    const cls = i < state.activeIndex ? 'done' : (i === state.activeIndex && !state.saved ? 'active' : '');
-    return `<div class="step-pill ${cls}">${labels[key]}</div>`;
-  }).join('');
+  stepperEl.innerHTML = `<ol class="stepper-list">` + STEPS.map((key, i) => {
+    const done = i < state.activeIndex;
+    const active = i === state.activeIndex && !state.saved;
+    const cls = done ? 'done' : (active ? 'active' : '');
+    const status = done ? 'completado' : (active ? 'paso actual' : 'pendiente');
+    return `<li class="step-pill ${cls}" ${active ? 'aria-current="step"' : ''}>
+      <span aria-hidden="true">${labels[key]}</span>
+      <span class="sr-only">${META[key].label}: ${status}</span>
+    </li>`;
+  }).join('') + `</ol>`;
 }
 
 function cellContent(key, idx) {
@@ -972,9 +998,10 @@ function cellContent(key, idx) {
   if (!active) return '—';
 
   // active row rendering
+  const aria = `aria-label="${meta.label}"`;
   if (key === 'opening') {
     if (isFirstOfMonth(state.dateISO)) {
-      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura">`;
+      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura" ${aria}>`;
     }
     const prevIso = prevIsoDate(state.dateISO);
     const prevRecord = db.find(r => r.dateISO === prevIso);
@@ -983,14 +1010,14 @@ function cellContent(key, idx) {
       return `${fmt(prevRecord.s3)}<span class="note-inline">Automático, tomado de ayer (${toDisplayDate(prevIso)})</span>`;
     } else {
       state._autoOpening = null;
-      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura">
+      return `<input type="number" id="stepInput" step="any" min="0" placeholder="Apertura" ${aria}>
         <span class="note-inline">No hay cierre de ayer guardado: ingresá manualmente.</span>`;
     }
   }
   if (key === 'platos') {
-    return `<input type="number" id="stepInput" min="1" max="500" step="1" placeholder="Cantidad">`;
+    return `<input type="number" id="stepInput" min="1" max="500" step="1" placeholder="Cantidad" ${aria}>`;
   }
-  return `<input type="number" id="stepInput" step="any" min="0" placeholder="Monto">`;
+  return `<input type="number" id="stepInput" step="any" min="0" placeholder="Monto" ${aria}>`;
 }
 
 function buildRows() {
@@ -1346,12 +1373,12 @@ function renderPlatosView() {
     .sort((a, b) => a.categoria.localeCompare(b.categoria) || a.nombre.localeCompare(b.nombre));
 
   const rowsHtml = rows.length ? rows.map(p => `
-    <tr class="plato-row" data-nombre="${escapeHtml(p.nombre)}">
+    <tr class="plato-row" data-nombre="${escapeHtml(p.nombre)}" tabindex="0" role="button" aria-label="Editar ${escapeHtml(p.nombre)}">
       <td>${escapeHtml(p.nombre)}</td>
       <td>${escapeHtml(p.categoria)}</td>
       <td>${toDisplayDate(p.ultimaFecha)}</td>
       <td>${fmt(p.ultimoPrecio)}</td>
-      <td><button type="button" class="plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}">✕</button></td>
+      <td><button type="button" class="plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}" aria-label="Eliminar ${escapeHtml(p.nombre)}">✕</button></td>
     </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);">${q ? 'Sin resultados' : 'No hay platos cargados'}</td></tr>`;
 
   const editing = !!platoForm.editingNombre;
@@ -1359,19 +1386,20 @@ function renderPlatosView() {
 
   appEl.innerHTML = `
     <div class="card">
-      <div class="gate-title">Platos</div>
-      <input id="platosSearchInput" class="pw-input" placeholder="Buscar plato..." value="${escapeHtml(platosViewState.search)}">
-      <div class="billing-table-wrap">
+      <h2 class="gate-title">Platos</h2>
+      <input id="platosSearchInput" class="pw-input" type="search" placeholder="Buscar plato..." aria-label="Buscar plato" value="${escapeHtml(platosViewState.search)}">
+      <div class="billing-table-wrap" tabindex="0" role="region" aria-label="Lista de platos">
         <table class="billing">
-          <thead><tr><th>Nombre</th><th>Categoría</th><th>Últ. uso</th><th>Últ. precio</th><th style="width:3.5ch;"></th></tr></thead>
+          <caption class="sr-only">Platos cargados en la base</caption>
+          <thead><tr><th>Nombre</th><th>Categoría</th><th>Últ. uso</th><th>Últ. precio</th><th style="width:3.5ch;"><span class="sr-only">Eliminar</span></th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>
-      <div style="margin-top:14px; font-weight:700;">${editing ? 'Editar plato' : 'Nuevo plato'}</div>
-      <input id="platoNombre" class="pw-input" placeholder="Nombre del plato (con guarnición)" value="${escapeHtml(platoForm.nombre)}" ${editing ? 'readonly' : ''}>
-      <input id="platoCategoria" class="pw-input" list="platoCategoriaList" placeholder="Categoría (ej. Carne, Pollo, Arroz)" value="${escapeHtml(platoForm.categoria)}">
+      <h3 class="form-section-title">${editing ? 'Editar plato' : 'Nuevo plato'}</h3>
+      <input id="platoNombre" class="pw-input" placeholder="Nombre del plato (con guarnición)" aria-label="Nombre del plato" value="${escapeHtml(platoForm.nombre)}" ${editing ? 'readonly' : ''}>
+      <input id="platoCategoria" class="pw-input" list="platoCategoriaList" placeholder="Categoría (ej. Carne, Pollo, Arroz)" aria-label="Categoría del plato" value="${escapeHtml(platoForm.categoria)}">
       <datalist id="platoCategoriaList">${categoriaOptions}</datalist>
-      <input id="platoPrecio" class="pw-input" type="number" step="any" min="0" placeholder="Último precio" value="${platoForm.ultimoPrecio}">
+      <input id="platoPrecio" class="pw-input" type="number" step="any" min="0" placeholder="Último precio" aria-label="Último precio del plato" value="${platoForm.ultimoPrecio}">
       <div class="error">${platoForm.error || platosViewState.error || ''}</div>
       <div class="controls">
         ${editing ? '<button class="secondary" id="cancelPlatoBtn">Cancelar</button>' : ''}
@@ -1423,13 +1451,13 @@ function renderPlatosView() {
 function renderDeletePlatoModalHtml() {
   const nombre = platosViewState.confirmDelete;
   return `
-    <div class="postres-modal-overlay" id="deletePlatoOverlay">
+    <div class="postres-modal-overlay" id="deletePlatoOverlay" role="dialog" aria-modal="true" aria-labelledby="deletePlatoTitle">
       <div class="postres-modal" style="max-width:480px;">
-        <div class="gate-title" style="margin-bottom:0;">¿Eliminar este plato?</div>
+        <h2 class="gate-title" id="deletePlatoTitle" style="margin-bottom:0;">¿Eliminar este plato?</h2>
         <div style="color:var(--text);">Vas a eliminar <strong>${escapeHtml(nombre)}</strong> de la base de platos. Esta acción no se puede deshacer.</div>
         <div class="error">${platosViewState.error || ''}</div>
         <div class="controls">
-          <button class="secondary" id="cancelDeletePlatoBtn" ${platosViewState.deleting ? 'disabled' : ''}>Cancelar</button>
+          <button class="secondary" id="cancelDeletePlatoBtn" data-modal-dismiss ${platosViewState.deleting ? 'disabled' : ''}>Cancelar</button>
           <button id="confirmDeletePlatoBtn" ${platosViewState.deleting ? 'disabled' : ''}>${platosViewState.deleting ? 'Eliminando…' : 'Sí, eliminar'}</button>
         </div>
       </div>
@@ -1501,14 +1529,14 @@ function renderMenuBuilderView() {
 
   const resultsHtml = !active
     ? ''
-    : `<div class="plato-search-results">${results.length ? results.map(p => `
-        <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}">
+    : `<div class="plato-search-results" role="listbox" aria-label="Platos encontrados">${results.length ? results.map(p => `
+        <div class="plato-search-item" data-nombre="${escapeHtml(p.nombre)}" role="option" tabindex="0" aria-label="Agregar ${escapeHtml(p.nombre)} al menú">
           <div class="plato-search-name">${escapeHtml(p.nombre)}</div>
           <div class="plato-search-meta">${escapeHtml(p.categoria)} · Últ. uso ${toDisplayDate(p.ultimaFecha)} · $ ${fmt(p.ultimoPrecio)}</div>
         </div>`).join('') : `<div class="plato-search-empty">Sin resultados</div>`}</div>`;
 
   const categoriaPillsHtml = PLATO_CATEGORIAS.filter(c => c !== 'Postre' && c !== 'Tartas').map(c =>
-    `<div class="month-tab plato-cat-pill ${cat === c ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</div>`
+    `<div class="month-tab plato-cat-pill ${cat === c ? 'active' : ''}" data-cat="${escapeHtml(c)}" role="button" tabindex="0" aria-pressed="${cat === c}">${escapeHtml(c)}</div>`
   ).join('');
 
   let successMsg = '';
@@ -1517,14 +1545,14 @@ function renderMenuBuilderView() {
 
   appEl.innerHTML = `
     <div class="card">
-      <div class="gate-title">Armado de menú del día</div>
+      <h2 class="gate-title">Armado de menú del día</h2>
       <div class="menu-builder-layout">
         <div class="menu-editor">
-          <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día...">${escapeHtml(menuBuilderState.text)}</textarea>
+          <textarea id="menuEditor" class="menu-textarea" placeholder="Escribí acá el menú del día..." aria-label="Texto del menú del día">${escapeHtml(menuBuilderState.text)}</textarea>
         </div>
         <div class="menu-search">
-          <input id="menuSearchInput" class="pw-input" placeholder="Buscá un plato o elegí una categoría para ver opciones" value="${escapeHtml(menuBuilderState.search)}">
-          <div class="plato-category-pills">${categoriaPillsHtml}</div>
+          <input id="menuSearchInput" class="pw-input" type="search" placeholder="Buscá un plato o elegí una categoría para ver opciones" aria-label="Buscar plato para agregar al menú" value="${escapeHtml(menuBuilderState.search)}">
+          <div class="plato-category-pills" role="group" aria-label="Filtrar por categoría">${categoriaPillsHtml}</div>
           ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>`}
           ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">🍰 Postres disponibles</button>` : ''}
           ${active ? '' : `<button type="button" class="postres-btn" id="tartasBtn">🥧 Tartas disponibles</button>`}
@@ -1615,16 +1643,16 @@ function renderPostresModalHtml() {
   const cols = Math.max(1, Math.ceil(postres.length / 3));
   const working = menuBuilderState.postresWorking || new Set();
   const chipsHtml = postres.map(p => `
-    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</div>
+    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}" role="checkbox" tabindex="0" aria-checked="${working.has(p.nombre)}">${escapeHtml(p.nombre)}</div>
   `).join('');
 
   return `
-    <div class="postres-modal-overlay" id="postresOverlay">
+    <div class="postres-modal-overlay" id="postresOverlay" role="dialog" aria-modal="true" aria-labelledby="postresModalTitle">
       <div class="postres-modal">
-        <div class="gate-title" style="margin-bottom:0;">Postres disponibles</div>
-        <div class="postres-grid" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
+        <h2 class="gate-title" id="postresModalTitle" style="margin-bottom:0;">Postres disponibles</h2>
+        <div class="postres-grid" role="group" aria-label="Postres disponibles" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
         <div class="controls">
-          <button class="secondary" id="postresCancelBtn">Cancelar</button>
+          <button class="secondary" id="postresCancelBtn" data-modal-dismiss>Cancelar</button>
           <button id="postresConfirmBtn">Confirmar</button>
         </div>
       </div>
@@ -1687,16 +1715,16 @@ function renderTartasModalHtml() {
   const cols = Math.max(1, Math.ceil(tartas.length / 3));
   const working = menuBuilderState.tartasWorking || new Set();
   const chipsHtml = tartas.map(p => `
-    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}">${escapeHtml(p.nombre)}</div>
+    <div class="postre-chip ${working.has(p.nombre) ? 'selected' : ''}" data-nombre="${escapeHtml(p.nombre)}" role="checkbox" tabindex="0" aria-checked="${working.has(p.nombre)}">${escapeHtml(p.nombre)}</div>
   `).join('');
 
   return `
-    <div class="postres-modal-overlay" id="tartasOverlay">
+    <div class="postres-modal-overlay" id="tartasOverlay" role="dialog" aria-modal="true" aria-labelledby="tartasModalTitle">
       <div class="postres-modal">
-        <div class="gate-title" style="margin-bottom:0;">Tartas disponibles</div>
-        <div class="postres-grid" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
+        <h2 class="gate-title" id="tartasModalTitle" style="margin-bottom:0;">Tartas disponibles</h2>
+        <div class="postres-grid" role="group" aria-label="Tartas disponibles" style="grid-template-columns: repeat(${cols}, 1fr);">${chipsHtml}</div>
         <div class="controls">
-          <button class="secondary" id="tartasCancelBtn">Cancelar</button>
+          <button class="secondary" id="tartasCancelBtn" data-modal-dismiss>Cancelar</button>
           <button id="tartasConfirmBtn">Confirmar</button>
         </div>
       </div>
@@ -1773,14 +1801,14 @@ function renderMenuBuilderConfirmView() {
   const rowsHtml = items.map((it, i) => `
     <div class="new-plato-row">
       <div class="new-plato-name">${escapeHtml(it.nombre)} — $ ${fmt(it.precio)}</div>
-      <input class="pw-input new-plato-categoria" data-idx="${i}" list="platoCategoriaList" placeholder="Categoría para este plato nuevo" value="${escapeHtml(it.categoria)}">
+      <input class="pw-input new-plato-categoria" data-idx="${i}" list="platoCategoriaList" placeholder="Categoría para este plato nuevo" aria-label="Categoría para ${escapeHtml(it.nombre)}" value="${escapeHtml(it.categoria)}">
     </div>`).join('');
   const categoriaOptions = PLATO_CATEGORIAS.map(c => `<option value="${escapeHtml(c)}">`).join('');
 
   appEl.innerHTML = `
     <div class="card">
-      <div class="gate-title">Platos nuevos detectados</div>
-      <div style="color:var(--muted); margin-bottom:10px;">No encontramos estos platos en la base. Asigná una categoría para darlos de alta junto con el menú de hoy.</div>
+      <h2 class="gate-title">Platos nuevos detectados</h2>
+      <p style="color:var(--muted); margin:0 0 10px;">No encontramos estos platos en la base. Asigná una categoría para darlos de alta junto con el menú de hoy.</p>
       ${rowsHtml}
       <datalist id="platoCategoriaList">${categoriaOptions}</datalist>
       <div class="error">${menuBuilderState.error || ''}</div>
@@ -1870,7 +1898,7 @@ function renderFacturacionView() {
   const totalF = sum('F'), totalT = sum('T'), totalFinal = sum('final'), totalPlatos = sum('platos');
 
   const tabsHtml = monthKeys.length
-    ? monthKeys.map(ym => `<div class="month-tab ${ym === facturacionMonth ? 'active' : ''}" data-ym="${ym}">${monthLabel(ym)}</div>`).join('')
+    ? monthKeys.map(ym => `<div class="month-tab ${ym === facturacionMonth ? 'active' : ''}" data-ym="${ym}" role="tab" tabindex="0" aria-selected="${ym === facturacionMonth}">${monthLabel(ym)}</div>`).join('')
     : '<div class="month-tab">Sin datos todavía</div>';
 
   const rowsHtml = rows.length ? rows.map(r => `
@@ -1882,10 +1910,11 @@ function renderFacturacionView() {
 
   appEl.innerHTML = `
     <div class="card">
-      <div class="gate-title">Facturación de Los Pumas Cafe</div>
-      <div class="stepper">${tabsHtml}</div>
-      <div class="billing-table-wrap">
+      <h2 class="gate-title">Facturación de Los Pumas Cafe</h2>
+      <div class="stepper" role="tablist" aria-label="Elegir mes">${tabsHtml}</div>
+      <div class="billing-table-wrap" tabindex="0" role="region" aria-label="Detalle de facturación del mes">
         <table class="billing">
+          <caption class="sr-only">Cierres diarios del mes seleccionado</caption>
           <colgroup>
             <col style="width:10ch"><col style="width:10ch"><col style="width:10ch">
             <col style="width:10ch"><col style="width:10ch"><col style="width:10ch">
@@ -1935,7 +1964,10 @@ function renderApp() {
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <table class="ledger">${buildRows()}</table>
+    <table class="ledger">
+      <caption class="sr-only">Cierre diario paso a paso</caption>
+      ${buildRows()}
+    </table>
     <div class="error">${state.error || ''}</div>
     <div class="controls">
       <button class="secondary" id="backToMenuFromCierreBtn" ${state.saving ? 'disabled' : ''}>← Volver al menú</button>
@@ -2132,7 +2164,98 @@ function fitToViewport() {
   fitWrapEl.style.transform = `scale(${scale})`;
 }
 
+/* ---------- Accesibilidad: anuncios, teclado y foco en modales ---------- */
+const liveRegionEl = document.getElementById('liveRegion');
+let lastAnnounced = '';
+let lastOpenDialog = null;
+let focusBeforeDialog = null;
+
+const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+// Los mensajes de error/éxito se re-crean con innerHTML en cada render, así que
+// un aria-live puesto sobre ellos nunca se anunciaría. Los espejamos acá.
+function syncLiveRegion() {
+  const msg = Array.from(appEl.querySelectorAll('.error, .success'))
+    .map(el => el.textContent.trim())
+    .filter(Boolean)
+    .join('. ');
+  if (msg === lastAnnounced) return;
+  lastAnnounced = msg;
+  liveRegionEl.textContent = msg;
+}
+
+// Cada render reemplaza el DOM con innerHTML, así que el foco se pierde salvo
+// que lo devolvamos a mano. Identificamos el elemento por id o por su data-*.
+function focusKeyOf(el) {
+  if (!el || el === document.body) return null;
+  if (el.id) return '#' + CSS.escape(el.id);
+  const d = el.dataset || {};
+  const cls = el.classList[0] ? '.' + CSS.escape(el.classList[0]) : '';
+  if (d.nombre) return `${cls}[data-nombre="${CSS.escape(d.nombre)}"]`;
+  if (d.cat) return `${cls}[data-cat="${CSS.escape(d.cat)}"]`;
+  if (d.ym) return `${cls}[data-ym="${CSS.escape(d.ym)}"]`;
+  return null;
+}
+
+function restoreFocus(key) {
+  if (!key) return;
+  // Si el propio render ya movió el foco a propósito, no se lo sacamos.
+  if (document.activeElement && document.activeElement !== document.body) return;
+  const el = document.querySelector(key);
+  if (el) el.focus();
+}
+
+function syncDialogFocus(previousFocusKey) {
+  const dialog = appEl.querySelector('[role="dialog"]');
+  const dialogId = dialog ? dialog.id : null;
+  if (dialogId === lastOpenDialog) {
+    restoreFocus(previousFocusKey);
+    return;
+  }
+  if (dialog) {
+    if (!lastOpenDialog) focusBeforeDialog = previousFocusKey;
+    const first = dialog.querySelector(FOCUSABLE);
+    if (first) first.focus();
+  } else {
+    restoreFocus(focusBeforeDialog || previousFocusKey);
+    focusBeforeDialog = null;
+  }
+  lastOpenDialog = dialogId;
+}
+
+// Enter/Espacio sobre los elementos que actúan como botones pero son divs.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest('[role="button"], [role="checkbox"], [role="option"], [role="tab"]');
+  if (!el) return;
+  e.preventDefault();
+  el.click();
+});
+
+document.addEventListener('keydown', (e) => {
+  const dialog = appEl.querySelector('[role="dialog"]');
+  if (!dialog) return;
+  if (e.key === 'Escape') {
+    const dismiss = dialog.querySelector('[data-modal-dismiss]');
+    if (dismiss && !dismiss.disabled) { e.preventDefault(); dismiss.click(); }
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  const items = Array.from(dialog.querySelectorAll(FOCUSABLE)).filter(el => !el.disabled);
+  if (!items.length) return;
+  const first = items[0], last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
 function renderAll() {
+  const previousFocusKey = focusKeyOf(document.activeElement);
+  renderScreen();
+  syncLiveRegion();
+  syncDialogFocus(previousFocusKey);
+}
+
+function renderScreen() {
   const screenKey = screenKeyFor();
   const screenChanged = screenKey !== lastScreenKey;
   lastScreenKey = screenKey;
@@ -2140,7 +2263,7 @@ function renderAll() {
   if (authStatus === 'resuming') {
     dateBarEl.innerHTML = '';
     stepperEl.innerHTML = '';
-    appEl.innerHTML = `<div class="card"><div class="gate-title">Cargando…</div></div>`;
+    appEl.innerHTML = `<div class="card"><p class="gate-title">Cargando…</p></div>`;
     if (screenChanged) playScreenTransition();
     requestAnimationFrame(fitToViewport);
     return;
@@ -2151,8 +2274,9 @@ function renderAll() {
     const checking = authStatus === 'checking';
     appEl.innerHTML = `
       <div class="card">
-        <div class="gate-title">Fabian, ingresá la contraseña</div>
-        <input type="password" id="gatePwInput" class="pw-input" placeholder="Contraseña" ${checking ? 'disabled' : ''}>
+        <h2 class="gate-title">Fabian, ingresá la contraseña</h2>
+        <label class="sr-only" for="gatePwInput">Contraseña</label>
+        <input type="password" id="gatePwInput" class="pw-input" placeholder="Contraseña" autocomplete="current-password" ${checking ? 'disabled' : ''}>
         <label class="remember-me-label">
           <input type="checkbox" id="gateRememberInput" ${rememberMe ? 'checked' : ''} ${checking ? 'disabled' : ''}>
           Mantener sesión iniciada
