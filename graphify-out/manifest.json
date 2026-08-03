@@ -1,0 +1,62 @@
+{
+  "worker/package.json": {
+    "mtime": 1785475698.2683103,
+    "ast_hash": "88efcd5566d69a0c94346ce67cd4e7ec",
+    "semantic_hash": "88efcd5566d69a0c94346ce67cd4e7ec"
+  },
+  "worker/src/index.js": {
+    "mtime": 1785637907.5856237,
+    "ast_hash": "718c688fd6625a698888ef7f20dd5421",
+    "semantic_hash": "718c688fd6625a698888ef7f20dd5421"
+  },
+  "index.html": {
+    "mtime": 1785639591.24883,
+    "ast_hash": "4e9e7bed0efd827ff6034ceb2958ea1e",
+    "semantic_hash": "4e9e7bed0efd827ff6034ceb2958ea1e"
+  },
+  "los-pumas-cafe.jpg": {
+    "mtime": 1785473785.0913403,
+    "ast_hash": "843249d987aeae9db681095d5bdb08b7",
+    "semantic_hash": "843249d987aeae9db681095d5bdb08b7"
+  },
+  ".claude/launch.json": {
+    "mtime": 1785539744.9201355,
+    "ast_hash": "2898dd5bb4a855deee8a5eb31be5371e",
+    "semantic_hash": "2898dd5bb4a855deee8a5eb31be5371e"
+  },
+  ".claude/settings.local.json": {
+    "mtime": 1785514919.3711753,
+    "ast_hash": "2522ea2dca0f29698b1cd8bb89abdc63",
+    "semantic_hash": "2522ea2dca0f29698b1cd8bb89abdc63"
+  },
+  "logo.jpg": {
+    "mtime": 1785535456.1945732,
+    "ast_hash": "e8f4b60ddd4d8c7f3bfb998d37c2b4e5",
+    "semantic_hash": "e8f4b60ddd4d8c7f3bfb998d37c2b4e5"
+  },
+  ".claude/skills/frontend-design/LICENSE.txt": {
+    "mtime": 1785624416.9323132,
+    "ast_hash": "2ee41112a44fe7014dce33e26468ba93",
+    "semantic_hash": "2ee41112a44fe7014dce33e26468ba93"
+  },
+  ".claude/skills/frontend-design/SKILL.md": {
+    "mtime": 1785624416.8740258,
+    "ast_hash": "31c633612585bf2dd4e6d1103afc9f33",
+    "semantic_hash": "31c633612585bf2dd4e6d1103afc9f33"
+  },
+  "logo_circular.png": {
+    "mtime": 1785637249.089,
+    "ast_hash": "6dfdc14e6841bb31b56ffb68099b1ee9",
+    "semantic_hash": "6dfdc14e6841bb31b56ffb68099b1ee9"
+  },
+  "logo_circular2.png": {
+    "mtime": 1785637227.9760363,
+    "ast_hash": "d889932fc31850b7adf6bd3523bcdd17",
+    "semantic_hash": "d889932fc31850b7adf6bd3523bcdd17"
+  },
+  "plantilla_menu.jpg": {
+    "mtime": 1785544080.2570755,
+    "ast_hash": "5bf5c98691a25244a348f4f7c79d6602",
+    "semantic_hash": "5bf5c98691a25244a348f4f7c79d6602"
+  }
+}
