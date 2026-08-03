@@ -66,8 +66,13 @@
     margin: 0;
   }
   input[type=number] { -moz-appearance: textfield; appearance: textfield; }
-  html, body { height: 100%; margin: 0; overflow: hidden; }
-  html { font-size: 21px; }
+  html, body { margin: 0; }
+  /* La animación de entrada desplaza la pantalla 28px hacia la derecha;
+     sin esto aparece una barra horizontal parpadeando en cada transición. */
+  body { overflow-x: hidden; }
+  /* Escala con el ancho pero parte del tamaño que eligió el usuario en el
+     navegador, en vez de imponer un px fijo. */
+  html { font-size: clamp(100%, 0.9rem + 0.4vw, 132%); }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     background:
@@ -76,17 +81,18 @@
     color: var(--text);
   }
   .viewport {
-    height: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
     width: 100%;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
+    padding: clamp(12px, 2vw, 24px);
   }
+  /* margin:auto en vez de align-items:center: centra igual, pero cuando el
+     contenido es más alto que la pantalla no recorta el borde superior. */
   #fitWrap {
+    margin: auto;
     width: 100%;
     max-width: 560px;
-    transform-origin: center center;
   }
   #fitWrap.wide { max-width: 900px; }
   #fitWrap.menu-wide { max-width: 1200px; }
@@ -264,7 +270,9 @@
     cursor: pointer;
   }
   .month-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  .billing-table-wrap { max-height: 58vh; overflow-y: auto; overflow-x: hidden; margin: 4px 0 12px; }
+  /* Las 9 columnas de facturación no entran abajo de ~900px: se scrollean
+     en horizontal en vez de quedar recortadas. */
+  .billing-table-wrap { max-height: 58vh; overflow: auto; margin: 4px 0 12px; }
 
   .billing-table-wrap,
   .plato-search-results,
@@ -398,9 +406,6 @@
 
   /* ---------- Dashboard ---------- */
   #fitWrap.dashboard { max-width: 1360px; }
-  html.dash-mode { overflow-y: auto; height: auto; }
-  html.dash-mode body { overflow-y: auto; height: auto; }
-  html.dash-mode .viewport { height: auto; min-height: 100vh; align-items: flex-start; padding: 20px 12px 48px; }
 
   .dashboard {
     --viz-series-1: #2a78d6;
@@ -563,6 +568,65 @@
 
   .dash-empty { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 20px 0; }
   .dash-link-btn { width: auto; flex: none; padding: 8px 12px; font-size: 0.82rem; }
+
+  /* ---------- Responsive ---------- */
+  /* Tablet: el armador de menú deja de entrar en dos columnas. */
+  @media (max-width: 820px) {
+    .menu-builder-layout { flex-direction: column; }
+    .menu-editor, .menu-search { flex: 1 1 auto; min-width: 0; }
+    .menu-textarea { min-height: 42vh; }
+    .plato-search-results { max-height: 32vh; }
+  }
+
+  /* En pantallas chicas las celdas se dimensionan por contenido y la tabla
+     se scrollea, en vez de partir cada palabra en dos renglones. */
+  @media (max-width: 700px) {
+    .billing-table-wrap { max-height: none; }
+    table.billing { table-layout: auto; min-width: 430px; }
+    table.billing-wide { min-width: 620px; }
+    table.billing th, table.billing td { white-space: nowrap; word-break: normal; }
+    table.billing-wide colgroup { display: none; }
+  }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 1.4rem; }
+    .subtitle { font-size: 0.9rem; }
+    .card { padding: 14px; border-radius: 12px; }
+    .dash-hero, .dash-widget { padding: 14px 16px; }
+    .date-bar { padding: 10px 12px; font-size: 1rem; }
+
+    /* Objetivos táctiles de al menos 44px. */
+    .step-pill, .month-tab { padding: 11px 14px; font-size: 0.85rem; min-height: 44px; display: flex; align-items: center; }
+    .plato-delete-btn { min-height: 44px; min-width: 44px; }
+    .postre-chip { min-height: 48px; }
+    .history-toggle { min-height: 44px; }
+
+    /* Los botones de acción pasan a ocupar el ancho completo, apilados. */
+    .controls { flex-direction: column; }
+    .controls button { width: 100%; min-width: 0; }
+
+    table.ledger td { padding: 7px 4px; font-size: 1rem; }
+    table.ledger tr.final-row td { font-size: 1.15rem; }
+    table.ledger .val input { max-width: none; min-height: 44px; }
+    .date-picker-btn { min-height: 44px; }
+
+    /* La cantidad de columnas se calcula en JS a partir del total de
+       ítems, así que en pantallas chicas hay que forzarla. */
+    .postres-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .postres-modal { padding: 16px; max-height: 88vh; }
+  }
+
+  @media (max-width: 380px) {
+    .postres-grid { grid-template-columns: 1fr !important; }
+    .top-bar-actions { width: 100%; }
+    .top-bar-actions button { flex: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .screen-enter, .stagger-child { animation: none; }
+    button:not(:disabled):hover { transform: none; }
+    * { transition-duration: 0.01ms !important; }
+  }
 </style>
 </head>
 <body>
@@ -1913,7 +1977,7 @@ function renderFacturacionView() {
       <h2 class="gate-title">Facturación de Los Pumas Cafe</h2>
       <div class="stepper" role="tablist" aria-label="Elegir mes">${tabsHtml}</div>
       <div class="billing-table-wrap" tabindex="0" role="region" aria-label="Detalle de facturación del mes">
-        <table class="billing">
+        <table class="billing billing-wide">
           <caption class="sr-only">Cierres diarios del mes seleccionado</caption>
           <colgroup>
             <col style="width:10ch"><col style="width:10ch"><col style="width:10ch">
@@ -2151,19 +2215,6 @@ function downloadCSV() {
   URL.revokeObjectURL(url);
 }
 
-function fitToViewport() {
-  if (view === 'menu') {
-    fitWrapEl.style.transform = 'none';
-    return;
-  }
-  fitWrapEl.style.transform = 'scale(1)';
-  const availH = window.innerHeight - 24;
-  const availW = window.innerWidth - 24;
-  const rect = fitWrapEl.getBoundingClientRect();
-  const scale = Math.min(1, availH / rect.height, availW / rect.width);
-  fitWrapEl.style.transform = `scale(${scale})`;
-}
-
 /* ---------- Accesibilidad: anuncios, teclado y foco en modales ---------- */
 const liveRegionEl = document.getElementById('liveRegion');
 let lastAnnounced = '';
@@ -2265,7 +2316,6 @@ function renderScreen() {
     stepperEl.innerHTML = '';
     appEl.innerHTML = `<div class="card"><p class="gate-title">Cargando…</p></div>`;
     if (screenChanged) playScreenTransition();
-    requestAnimationFrame(fitToViewport);
     return;
   }
   if (authStatus !== 'ready') {
@@ -2293,13 +2343,11 @@ function renderScreen() {
     gateInput.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     if (!checking) gateInput.focus();
     if (screenChanged) playScreenTransition();
-    requestAnimationFrame(fitToViewport);
     return;
   }
   fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos');
   fitWrapEl.classList.toggle('menu-wide', view === 'menuBuilder');
   fitWrapEl.classList.toggle('dashboard', view === 'menu');
-  document.documentElement.classList.toggle('dash-mode', view === 'menu');
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
@@ -2314,14 +2362,8 @@ function renderScreen() {
     renderApp();
   }
   if (screenChanged) playScreenTransition();
-  requestAnimationFrame(fitToViewport);
 }
 
-window.addEventListener('resize', fitToViewport);
-window.addEventListener('orientationchange', () => setTimeout(fitToViewport, 100));
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', fitToViewport);
-}
 document.getElementById('menuBtn').onclick = () => { view = 'menu'; renderAll(); };
 
 function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
