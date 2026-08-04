@@ -33,6 +33,13 @@ let focusBeforeDialog = null;
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
+// Para avisos que no dejan rastro en pantalla (mover un módulo, por ejemplo):
+// el resultado sólo se ve, así que hay que decirlo.
+function announce(msg) {
+  if (!msg) return;
+  liveRegionEl.textContent = msg;
+}
+
 // Los mensajes de error/éxito se re-crean con innerHTML en cada render, así que
 // un aria-live puesto sobre ellos nunca se anunciaría. Los espejamos acá.
 function syncLiveRegion() {
@@ -158,6 +165,7 @@ function renderScreen() {
   fitWrapEl.classList.toggle('wide', view === 'facturacion' || view === 'platos');
   fitWrapEl.classList.toggle('menu-wide', view === 'menuBuilder');
   fitWrapEl.classList.toggle('dashboard', view === 'menu');
+  if (view !== 'menu') exitDashboardEditing();
   if (view === 'menu') {
     renderMenu();
   } else if (view === 'facturacion') {
@@ -181,8 +189,14 @@ function currentTheme() { return document.documentElement.getAttribute('data-the
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   try { localStorage.setItem('lospumas_theme', theme); } catch (e) {}
-  document.getElementById('themeToggleBtn').textContent = theme === 'dark' ? '☀️' : '🌙';
+  // El icono muestra a qué tema se pasa, no en cuál se está.
+  document.getElementById('themeToggleBtn').innerHTML = icon(theme === 'dark' ? 'sun' : 'moon');
 }
+
+// Los botones fijos del encabezado viven en el HTML; sus iconos se inyectan acá
+// para no repetir el SVG a mano.
+document.getElementById('logoutBtn').insertAdjacentHTML('afterbegin', icon('logout'));
+document.getElementById('menuBtn').insertAdjacentHTML('afterbegin', icon('home'));
 
 applyTheme(currentTheme());
 

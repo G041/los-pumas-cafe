@@ -239,6 +239,13 @@
     flex: 1;
     transition: transform .26s ease, box-shadow .26s ease;
   }
+  /* Los iconos heredan el color del texto y se alinean con su línea base. */
+  .icon { flex: none; vertical-align: -0.18em; }
+  button > .icon:first-child { margin-right: 0.4em; }
+  button > .icon:last-child { margin-left: 0.4em; }
+  button > .icon:only-child { margin: 0; }
+  .theme-toggle, .plato-delete-btn { display: inline-flex; align-items: center; justify-content: center; }
+
   button:disabled { opacity: 0.35; cursor: not-allowed; }
   button:not(:disabled):hover { transform: scale(1.05); box-shadow: 0 0 0 3px rgba(62, 179, 238, 0.35); }
   button.secondary { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
@@ -469,15 +476,39 @@
     font-weight: 700;
     font-size: var(--font-sm);
   }
+  .dash-hero-mark { display: inline-flex; vertical-align: -0.2em; margin-left: 3px; color: var(--muted); }
   .dash-hero-status.ok { background: var(--done-bg); color: var(--ok); }
   .dash-hero-status.pending { background: var(--input-bg); color: var(--muted); }
   .dash-hero-status button { width: auto; padding: 9px 15px; font-size: var(--font-sm); }
 
-  .dash-kpis {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 14px;
+  .dash-hero-actions { display: flex; flex: none; gap: var(--space-3); }
+  .dash-edit-btn {
+    width: auto;
+    flex: none;
+    padding: 10px 15px;
+    font-size: var(--font-sm);
+    white-space: nowrap;
   }
+  .dash-edit-hint { margin: 0; color: var(--muted); font-size: var(--font-xs); }
+
+  /* Grilla de 12 columnas: cada módulo declara cuántas ocupa, así cualquiera
+     puede ir a cualquier lugar sin romper la fila. */
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: var(--space-5);
+    position: relative;
+  }
+  .bento-item { min-width: 0; }
+  .bento-item > .dash-kpi,
+  .bento-item > .dash-widget { height: 100%; }
+
+  .bento-span-3 { grid-column: span 3; }
+  .bento-span-4 { grid-column: span 4; }
+  .bento-span-6 { grid-column: span 6; }
+  .bento-span-8 { grid-column: span 8; }
+  .bento-span-12 { grid-column: span 12; }
+
   .dash-kpi {
     background: var(--card);
     border: 1px solid var(--card-border);
@@ -495,13 +526,87 @@
   .dash-kpi-delta.down { color: var(--danger); }
   .dash-kpi-delta.flat { color: var(--muted); font-weight: 600; }
 
-  .dash-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    gap: 16px;
-    align-items: start;
+  /* ---------- Modo personalizar ---------- */
+  .bento-grid.editing .bento-item {
+    position: relative;
+    cursor: grab;
+    /* El arrastre toma el control del gesto; para llegar más abajo, el propio
+       arrastre scrollea al acercarse al borde. */
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  @media (max-width: 860px) { .dash-grid { grid-template-columns: minmax(0, 1fr); } }
+  /* La tarjeta entera pasa a ser algo que se agarra, no una pantalla que se usa. */
+  .bento-grid.editing .bento-item > * { pointer-events: none; }
+  .bento-grid.editing .bento-item > :first-child {
+    border-style: dashed;
+    animation: bento-wiggle 0.7s ease-in-out infinite;
+  }
+  .bento-grid.editing .bento-item:nth-child(2n) > :first-child { animation-delay: -0.23s; }
+  .bento-grid.editing .bento-item:nth-child(3n) > :first-child { animation-delay: -0.46s; }
+  .bento-grid.editing .bento-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: var(--radius-xl);
+  }
+
+  .bento-grip {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    display: flex;
+    color: var(--muted);
+    opacity: 0.5;
+  }
+
+  /* El hueco que deja el módulo agarrado: marca dónde va a caer. */
+  .bento-item.placeholder > :first-child { opacity: 0; animation: none; }
+  .bento-item.placeholder > .bento-grip { opacity: 0; }
+  .bento-item.placeholder::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius-xl);
+    opacity: 0.45;
+  }
+
+  /* La copia que sigue al dedo o al mouse. */
+  .bento-ghost {
+    position: fixed;
+    z-index: 60;
+    margin: 0;
+    pointer-events: none;
+    cursor: grabbing;
+  }
+  .bento-ghost > :first-child {
+    height: 100%;
+    animation: none;
+    border-style: solid;
+    border-color: var(--accent);
+    box-shadow: var(--shadow-modal);
+    transform: scale(1.02);
+    transition: transform var(--dur-med, 300ms) ease, box-shadow var(--dur-med, 300ms) ease;
+  }
+  .bento-ghost.landing > :first-child {
+    transform: none;
+    box-shadow: var(--shadow-card);
+  }
+
+  @keyframes bento-wiggle {
+    0%, 100% { transform: rotate(-0.4deg); }
+    50%      { transform: rotate(0.4deg); }
+  }
+
+  @media (max-width: 860px) {
+    .bento-span-3 { grid-column: span 6; }
+    .bento-span-4,
+    .bento-span-6,
+    .bento-span-8 { grid-column: span 12; }
+  }
+  @media (max-width: 560px) {
+    .bento-span-3 { grid-column: span 12; }
+  }
 
   .dash-widget {
     background: var(--card);
@@ -532,10 +637,12 @@
   .dash-action-icon {
     flex: none;
     width: 36px; height: 36px;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     display: flex; align-items: center; justify-content: center;
-    font-size: var(--font-md);
-    color: #ffffff;
+    /* Fondo teñido con el color del módulo en vez de un bloque saturado. */
+    background: var(--input-bg);
+    background: color-mix(in srgb, var(--tile) 15%, transparent);
+    color: var(--tile);
   }
 
   .dash-chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
@@ -559,11 +666,21 @@
   .dash-tooltip .tt-date { color: var(--muted); font-size: var(--font-2xs); }
   .dash-tooltip .tt-val { font-weight: 700; }
 
-  .dash-weekday-bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; }
-  .dash-weekday-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
-  .dash-weekday-value, .dash-weekday-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .dash-weekday-value { font-size: var(--font-2xs); font-weight: 700; color: var(--muted); visibility: hidden; }
-  .dash-weekday-col.best .dash-weekday-value { color: var(--viz-series-1); visibility: visible; }
+  .dash-weekday-bars { display: flex; align-items: stretch; gap: var(--space-3); height: 150px; }
+  .dash-weekday-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+  /* El valor y el día no se achican: si flex les recorta la altura para hacerle
+     lugar a la barra, el overflow oculto les come el texto por la mitad. */
+  .dash-weekday-label {
+    flex: none;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  /* La barra se mide contra este carril, no contra la columna entera: así su
+     altura es proporcional de verdad y nunca empuja al texto afuera. */
+  .dash-weekday-track { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
   .dash-weekday-bar { width: 100%; max-width: 34px; border-radius: 8px 8px 3px 3px; background: var(--viz-muted-bar); min-height: 4px; }
   .dash-weekday-col.best .dash-weekday-bar { background: var(--viz-series-1); }
   .dash-weekday-label { font-size: var(--font-xs); color: var(--muted); font-weight: 600; }
@@ -644,6 +761,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .screen-enter, .stagger-child { animation: none; }
+    .bento-grid.editing .bento-item > :first-child { animation: none; }
     button:not(:disabled):hover { transform: none; }
     * { transition-duration: 0.01ms !important; }
   }

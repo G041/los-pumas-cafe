@@ -141,7 +141,7 @@ function renderMenuBuilderView() {
   ).join('');
 
   let successMsg = '';
-  if (menuBuilderState.success === 'copied') successMsg = 'Menú guardado y copiado al portapapeles ✔';
+  if (menuBuilderState.success === 'copied') successMsg = 'Menú guardado y copiado al portapapeles';
   else if (menuBuilderState.success === 'saved_no_copy') successMsg = 'Menú guardado, pero no se pudo copiar automáticamente. Copialo manualmente.';
 
   appEl.innerHTML = `
@@ -154,18 +154,18 @@ function renderMenuBuilderView() {
         <div class="menu-search">
           <input id="menuSearchInput" class="pw-input" type="search" placeholder="Buscá un plato o elegí una categoría para ver opciones" aria-label="Buscar plato para agregar al menú" value="${escapeHtml(menuBuilderState.search)}">
           <div class="plato-category-pills" role="group" aria-label="Filtrar por categoría">${categoriaPillsHtml}</div>
-          ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">🍰 Postres disponibles</button>`}
-          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">🍰 Postres disponibles</button>` : ''}
-          ${active ? '' : `<button type="button" class="postres-btn" id="tartasBtn">🥧 Tartas disponibles</button>`}
-          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="tartasBtn">🥧 Tartas disponibles</button>` : ''}
-          <button type="button" class="secondary" id="undoPlatoBtn" style="margin-top:auto;">↶ Deshacer</button>
+          ${active ? resultsHtml : `<button type="button" class="postres-btn" id="postresBtn">${icon('cake',18)} Postres disponibles</button>`}
+          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="postresBtn">${icon('cake',18)} Postres disponibles</button>` : ''}
+          ${active ? '' : `<button type="button" class="postres-btn" id="tartasBtn">${icon('pie',18)} Tartas disponibles</button>`}
+          ${active ? `<button type="button" class="postres-btn postres-btn-compact" id="tartasBtn">${icon('pie',18)} Tartas disponibles</button>` : ''}
+          <button type="button" class="secondary" id="undoPlatoBtn" style="margin-top:auto;">${icon('undo',16)} Deshacer</button>
         </div>
       </div>
       <div class="error">${menuBuilderState.error || ''}</div>
       ${successMsg ? `<div class="success" style="font-size:1rem;">${successMsg}</div>` : ''}
       <div class="controls">
-        <button class="secondary" id="backToMenuFromBuilderBtn">← Volver al menú</button>
-        <button class="secondary" id="goPlatosFromBuilderBtn">⚙️ Gestionar platos</button>
+        <button class="secondary" id="backToMenuFromBuilderBtn">${icon('arrowLeft',16)} Volver al menú</button>
+        <button class="secondary" id="goPlatosFromBuilderBtn">${icon('sliders',16)} Gestionar platos</button>
         <button id="copiarMenuBtn" ${menuBuilderState.saving ? 'disabled' : ''}>${menuBuilderState.saving ? 'Guardando…' : 'Copiar menú'}</button>
       </div>
     </div>

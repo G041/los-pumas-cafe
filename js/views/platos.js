@@ -13,7 +13,7 @@ function renderPlatosView() {
       <td>${escapeHtml(p.categoria)}</td>
       <td>${toDisplayDate(p.ultimaFecha)}</td>
       <td>${fmt(p.ultimoPrecio)}</td>
-      <td><button type="button" class="plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}" aria-label="Eliminar ${escapeHtml(p.nombre)}">✕</button></td>
+      <td><button type="button" class="plato-delete-btn" data-nombre="${escapeHtml(p.nombre)}" aria-label="Eliminar ${escapeHtml(p.nombre)}">${icon('close',16)}</button></td>
     </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--muted);">${q ? 'Sin resultados' : 'No hay platos cargados'}</td></tr>`;
 
   const editing = !!platoForm.editingNombre;
@@ -41,8 +41,8 @@ function renderPlatosView() {
         <button id="savePlatoBtn" ${platoForm.saving ? 'disabled' : ''}>${platoForm.saving ? 'Guardando…' : (editing ? 'Guardar cambios' : 'Agregar plato')}</button>
       </div>
       <div class="controls">
-        <button class="secondary" id="backToMenuFromPlatosBtn">← Volver al menú</button>
-        <button class="secondary" id="backToBuilderFromPlatosBtn">← Volver al armado de menú</button>
+        <button class="secondary" id="backToMenuFromPlatosBtn">${icon('arrowLeft',16)} Volver al menú</button>
+        <button class="secondary" id="backToBuilderFromPlatosBtn">${icon('arrowLeft',16)} Volver al armado de menú</button>
       </div>
     </div>
     ${platosViewState.confirmDelete ? renderDeletePlatoModalHtml() : ''}`;

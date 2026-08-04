@@ -84,4 +84,42 @@ const fitWrapEl = document.getElementById('fitWrap');
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+const WEEKDAY_LABELS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+/* ---------- Orden de los módulos del dashboard ---------- */
+// Es una preferencia visual de quien mira la pantalla, no un dato del negocio:
+// vive en el navegador y nunca viaja al Worker.
+const DASHBOARD_ORDER_KEY = 'lospumas_dashboard_order';
+
+const DASHBOARD_ORDER_DEFAULT = [
+  'kpi-ventas', 'kpi-ticket', 'kpi-platos', 'kpi-fiscal',
+  'widget-sales', 'widget-actions', 'widget-weekday', 'widget-split', 'widget-recent',
+];
+
+// Ignora ids que ya no existen y agrega al final los módulos nuevos, así un
+// orden guardado con una versión vieja de la app sigue sirviendo.
+function loadDashboardOrder() {
+  let saved = [];
+  try {
+    const raw = localStorage.getItem(DASHBOARD_ORDER_KEY);
+    if (raw) saved = JSON.parse(raw);
+  } catch (e) {}
+  if (!Array.isArray(saved)) saved = [];
+  const known = new Set(DASHBOARD_ORDER_DEFAULT);
+  const order = saved.filter(id => known.has(id));
+  DASHBOARD_ORDER_DEFAULT.forEach(id => { if (!order.includes(id)) order.push(id); });
+  return order;
+}
+
+function saveDashboardOrder() {
+  try { localStorage.setItem(DASHBOARD_ORDER_KEY, JSON.stringify(dashboardOrder)); } catch (e) {}
+}
+
+let dashboardOrder = loadDashboardOrder();
+
+let dashboardEditing = false;
+
+// Copia previa a entrar en edición, para poder cancelar sin guardar.
+let dashboardOrderBackup = null;
+
 let autoAdvanceTimer = null;

@@ -7,7 +7,7 @@ function finalResult() { return s4() - (state.values.opening||0); }
 function renderDateBar() {
   dateBarEl.innerHTML = `
     <span>Cerrando el día <strong>${toDisplayDate(state.dateISO)}</strong></span>
-    <button class="date-picker-btn" type="button" id="openDatePicker">📅 Cambiar fecha</button>
+    <button class="date-picker-btn" type="button" id="openDatePicker">${icon('calendar',16)} Cambiar fecha</button>
     <input type="date" id="dateInput" class="hidden-date-input" value="${state.dateISO}" tabindex="-1" aria-label="Fecha del cierre">
   `;
   const dateInput = dateBarEl.querySelector('#dateInput');
@@ -131,9 +131,9 @@ function renderApp() {
     </table>
     <div class="error">${state.error || ''}</div>
     <div class="controls">
-      <button class="secondary" id="backToMenuFromCierreBtn" ${state.saving ? 'disabled' : ''}>← Volver al menú</button>
-      <button class="secondary" id="backBtn" ${state.activeIndex === 0 || state.saving ? 'disabled' : ''}>← Atrás</button>
-      <button id="confirmBtn" ${state.saving ? 'disabled' : ''}>${isFinalStep ? (state.saving ? 'Guardando…' : 'Guardar día') : 'Confirmar →'}</button>
+      <button class="secondary" id="backToMenuFromCierreBtn" ${state.saving ? 'disabled' : ''}>${icon('arrowLeft',16)} Volver al menú</button>
+      <button class="secondary" id="backBtn" ${state.activeIndex === 0 || state.saving ? 'disabled' : ''}>${icon('arrowLeft',16)} Atrás</button>
+      <button id="confirmBtn" ${state.saving ? 'disabled' : ''}>${isFinalStep ? (state.saving ? 'Guardando…' : 'Guardar día') : `Confirmar ${icon('arrowRight',16)}`}</button>
     </div>
   `;
   appEl.innerHTML = '';

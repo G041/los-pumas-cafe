@@ -47,7 +47,7 @@ function renderFacturacionView() {
         </table>
       </div>
       <div class="controls">
-        <button class="secondary" id="backToMenuBtn">← Volver al menú</button>
+        <button class="secondary" id="backToMenuBtn">${icon('arrowLeft',16)} Volver al menú</button>
         <button class="secondary" id="downloadCsvBtn">Descargar CSV</button>
         <button class="secondary" id="downloadXlsxBtn2">Descargar XLSX</button>
       </div>
