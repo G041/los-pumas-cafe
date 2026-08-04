@@ -10,9 +10,9 @@
     "semantic_hash": "718c688fd6625a698888ef7f20dd5421"
   },
   "index.html": {
-    "mtime": 1785639591.24883,
-    "ast_hash": "4e9e7bed0efd827ff6034ceb2958ea1e",
-    "semantic_hash": "4e9e7bed0efd827ff6034ceb2958ea1e"
+    "mtime": 1785823162.0938606,
+    "ast_hash": "f7d4441bd071fc690f15fe175d8a2905",
+    "semantic_hash": "f7d4441bd071fc690f15fe175d8a2905"
   },
   "los-pumas-cafe.jpg": {
     "mtime": 1785473785.0913403,
@@ -20,43 +20,68 @@
     "semantic_hash": "843249d987aeae9db681095d5bdb08b7"
   },
   ".claude/launch.json": {
-    "mtime": 1785539744.9201355,
-    "ast_hash": "2898dd5bb4a855deee8a5eb31be5371e",
-    "semantic_hash": "2898dd5bb4a855deee8a5eb31be5371e"
-  },
-  ".claude/settings.local.json": {
-    "mtime": 1785514919.3711753,
-    "ast_hash": "2522ea2dca0f29698b1cd8bb89abdc63",
-    "semantic_hash": "2522ea2dca0f29698b1cd8bb89abdc63"
-  },
-  "logo.jpg": {
-    "mtime": 1785535456.1945732,
-    "ast_hash": "e8f4b60ddd4d8c7f3bfb998d37c2b4e5",
-    "semantic_hash": "e8f4b60ddd4d8c7f3bfb998d37c2b4e5"
-  },
-  ".claude/skills/frontend-design/LICENSE.txt": {
-    "mtime": 1785624416.9323132,
-    "ast_hash": "2ee41112a44fe7014dce33e26468ba93",
-    "semantic_hash": "2ee41112a44fe7014dce33e26468ba93"
-  },
-  ".claude/skills/frontend-design/SKILL.md": {
-    "mtime": 1785624416.8740258,
-    "ast_hash": "31c633612585bf2dd4e6d1103afc9f33",
-    "semantic_hash": "31c633612585bf2dd4e6d1103afc9f33"
+    "mtime": 1785812116.3902504,
+    "ast_hash": "0f6c2e7bd4897da7719976010484d409",
+    "semantic_hash": "0f6c2e7bd4897da7719976010484d409"
   },
   "logo_circular.png": {
-    "mtime": 1785637249.089,
-    "ast_hash": "6dfdc14e6841bb31b56ffb68099b1ee9",
-    "semantic_hash": "6dfdc14e6841bb31b56ffb68099b1ee9"
+    "mtime": 1785642490.396,
+    "ast_hash": "aaf0000ee4e600038d5742ac1cdfa8d9",
+    "semantic_hash": "aaf0000ee4e600038d5742ac1cdfa8d9"
   },
-  "logo_circular2.png": {
-    "mtime": 1785637227.9760363,
-    "ast_hash": "d889932fc31850b7adf6bd3523bcdd17",
-    "semantic_hash": "d889932fc31850b7adf6bd3523bcdd17"
+  "js/api.js": {
+    "mtime": 1785812106.6917708,
+    "ast_hash": "1fec9674c295c8f81fd21cafb2491dd9",
+    "semantic_hash": "1fec9674c295c8f81fd21cafb2491dd9"
   },
-  "plantilla_menu.jpg": {
-    "mtime": 1785544080.2570755,
-    "ast_hash": "5bf5c98691a25244a348f4f7c79d6602",
-    "semantic_hash": "5bf5c98691a25244a348f4f7c79d6602"
+  "js/app.js": {
+    "mtime": 1785815915.7486184,
+    "ast_hash": "7b7ab75d8316d661514a60918ea56feb",
+    "semantic_hash": "7b7ab75d8316d661514a60918ea56feb"
+  },
+  "js/icons.js": {
+    "mtime": 1785823109.2247164,
+    "ast_hash": "127474405d685c86a857072c1bc456a3",
+    "semantic_hash": "127474405d685c86a857072c1bc456a3"
+  },
+  "js/state.js": {
+    "mtime": 1785824292.6457534,
+    "ast_hash": "4c02155ac6591f2cfeaf321fdba143c3",
+    "semantic_hash": "4c02155ac6591f2cfeaf321fdba143c3"
+  },
+  "js/utils.js": {
+    "mtime": 1785749238.8135207,
+    "ast_hash": "f5557c030d019a9a232dc645f1df4cc4",
+    "semantic_hash": "f5557c030d019a9a232dc645f1df4cc4"
+  },
+  "js/views/cierre.js": {
+    "mtime": 1785815992.6583948,
+    "ast_hash": "c4588be273e0da787b84cebeb992e773",
+    "semantic_hash": "c4588be273e0da787b84cebeb992e773"
+  },
+  "js/views/dashboard.js": {
+    "mtime": 1785824748.9035268,
+    "ast_hash": "e4810a4b6b8a8ac7c5df62ffb02624cd",
+    "semantic_hash": "e4810a4b6b8a8ac7c5df62ffb02624cd"
+  },
+  "js/views/facturacion.js": {
+    "mtime": 1785815992.663301,
+    "ast_hash": "28324699d3b6385c7bac84f33d35f991",
+    "semantic_hash": "28324699d3b6385c7bac84f33d35f991"
+  },
+  "js/views/menuBuilder.js": {
+    "mtime": 1785816010.6776762,
+    "ast_hash": "a768290f2b7195a2f84512305001509e",
+    "semantic_hash": "a768290f2b7195a2f84512305001509e"
+  },
+  "js/views/platos.js": {
+    "mtime": 1785815992.6642997,
+    "ast_hash": "512e0507f0897a7449b85f41a2574e3e",
+    "semantic_hash": "512e0507f0897a7449b85f41a2574e3e"
+  },
+  "js/weather.js": {
+    "mtime": 1785823270.2483692,
+    "ast_hash": "a62c81879e6c35f2cbb2ac833c4e1079",
+    "semantic_hash": "a62c81879e6c35f2cbb2ac833c4e1079"
   }
 }
