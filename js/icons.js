@@ -25,6 +25,16 @@ const ICON_PATHS = {
   arrowUp:   '<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>',
   arrowDown: '<path d="M12 5v14"/><path d="m6 13 6 6 6-6"/>',
   minus:     '<path d="M5 12h14"/>',
+
+  /* Clima. Todos comparten la misma nube para que la tira de siete días se lea
+     como una sola familia y lo que cambie sea sólo lo que cae debajo. */
+  cloud:     '<path d="M7 19h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 11 4 4 0 0 0 7 19Z"/>',
+  cloudSun:  '<path d="M12 3v1.5M5.6 5.6l1.1 1.1M3 12h1.5M18.4 5.6l-1.1 1.1"/><path d="M8.4 8.7a3.6 3.6 0 0 1 6.4 1.5"/><path d="M9 20h8.5a3.5 3.5 0 0 0 .2-7 5 5 0 0 0-9.5-.6A3.7 3.7 0 0 0 9 20Z"/>',
+  fog:       '<path d="M7 14h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 6 4 4 0 0 0 7 14Z"/><path d="M4 18h10M17 18h3M7 21.5h9"/>',
+  drizzle:   '<path d="M7 14h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 6 4 4 0 0 0 7 14Z"/><path d="M9 17.5v1.5M14.5 17.5v1.5"/>',
+  rain:      '<path d="M7 14h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 6 4 4 0 0 0 7 14Z"/><path d="m9 17.5-1 3.5M14.5 17.5l-1 3.5M11.8 18l-1 3.5"/>',
+  storm:     '<path d="M7 14h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 6 4 4 0 0 0 7 14Z"/><path d="M13.5 16.5 10 19h3l-1.5 3"/>',
+  snow:      '<path d="M7 14h10.5a3.5 3.5 0 0 0 .3-7A5.5 5.5 0 0 0 7.3 6 4 4 0 0 0 7 14Z"/><path d="M9 18h.01M12 20h.01M15 18h.01"/>',
 };
 
 // Los puntos del asa se leen mejor macizos que delineados.

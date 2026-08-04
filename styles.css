@@ -696,6 +696,78 @@
   .dash-split-dot.cash { background: var(--viz-series-1); }
   .dash-split-dot.card { background: var(--viz-series-2); }
 
+  /* Siete columnas iguales: el ancho lo reparte la grilla, así que ningún día
+     queda más angosto que otro por tener un texto más largo. */
+  .dash-weather-strip {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+  .dash-weather-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    text-align: center;
+    min-width: 0;
+  }
+  .dash-weather-day.today {
+    background: var(--input-bg);
+    border-color: color-mix(in srgb, var(--viz-series-1) 45%, transparent);
+  }
+  .dash-weather-name { font-size: var(--font-xs); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .dash-weather-day.today .dash-weather-name { color: var(--viz-series-1); }
+  .dash-weather-icon { color: var(--viz-series-1); display: flex; }
+  /* La descripción puede ocupar dos renglones ("Parcialmente nublado"); se le
+     reserva el alto para que las temperaturas queden alineadas entre columnas. */
+  .dash-weather-label {
+    font-size: var(--font-2xs);
+    color: var(--muted);
+    line-height: 1.3;
+    min-height: calc(var(--font-2xs) * 1.3 * 2);
+  }
+  .dash-weather-temps { display: flex; align-items: baseline; gap: var(--space-2); font-variant-numeric: tabular-nums; }
+  .dash-weather-max { font-size: var(--font-md); font-weight: 800; }
+  .dash-weather-min { font-size: var(--font-sm); color: var(--muted); font-weight: 600; }
+  /* Siempre presente aunque esté vacío: si apareciera sólo en los días con
+     lluvia, esas columnas serían más altas que el resto. */
+  .dash-weather-pop {
+    min-height: 1.1em;
+    font-size: var(--font-2xs);
+    font-weight: 700;
+    color: var(--viz-series-1);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .dash-weather-bone { background: var(--input-bg); border-radius: var(--radius-sm); animation: weather-pulse 1.4s ease-in-out infinite; }
+  .dash-weather-bone.name { width: 60%; height: 11px; }
+  .dash-weather-bone.dot { width: 28px; height: 28px; border-radius: 50%; }
+  .dash-weather-bone.line { width: 75%; height: 15px; }
+  .dash-weather-day.skeleton { gap: 10px; padding-top: 18px; padding-bottom: 18px; }
+
+  @keyframes weather-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.45; }
+  }
+
+  /* En pantallas chicas los siete días no entran: se scrollean en horizontal
+     en vez de aplastarse hasta partir cada palabra. */
+  @media (max-width: 720px) {
+    .dash-weather-strip {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x proximity;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: var(--space-2);
+    }
+    .dash-weather-day { flex: 0 0 auto; width: 96px; scroll-snap-align: start; }
+  }
+
   table.dash-recent { width: 100%; border-collapse: collapse; }
   table.dash-recent th, table.dash-recent td { text-align: right; padding: 7px 6px; font-size: var(--font-sm); border-bottom: 1px solid var(--card-border); }
   table.dash-recent th:first-child, table.dash-recent td:first-child { text-align: left; }
@@ -762,6 +834,7 @@
   @media (prefers-reduced-motion: reduce) {
     .screen-enter, .stagger-child { animation: none; }
     .bento-grid.editing .bento-item > :first-child { animation: none; }
+    .dash-weather-bone { animation: none; }
     button:not(:disabled):hover { transform: none; }
     * { transition-duration: 0.01ms !important; }
   }

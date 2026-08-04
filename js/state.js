@@ -94,6 +94,7 @@ const DASHBOARD_ORDER_KEY = 'lospumas_dashboard_order';
 const DASHBOARD_ORDER_DEFAULT = [
   'kpi-ventas', 'kpi-ticket', 'kpi-platos', 'kpi-fiscal',
   'widget-sales', 'widget-actions', 'widget-weekday', 'widget-split', 'widget-recent',
+  'widget-clima',
 ];
 
 // Ignora ids que ya no existen y agrega al final los módulos nuevos, así un

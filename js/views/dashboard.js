@@ -145,6 +145,83 @@ function wireTrendChartHover(wrapEl, chart) {
   });
 }
 
+/* ---------- Clima ----------
+   El pronóstico llega después del render, así que el módulo se dibuja con lo
+   que haya (esqueleto, datos o error) y se repinta solo cuando la respuesta
+   aterriza. */
+
+function weatherDayLabel(dateISO, i) {
+  if (i === 0) return 'Hoy';
+  const jsDay = new Date(dateISO + 'T00:00:00').getDay();
+  return WEEKDAY_LABELS[(jsDay + 6) % 7]; // Lun=0 .. Dom=6, igual que arriba
+}
+
+function buildWeatherStrip() {
+  return weatherState.days.map((d, i) => {
+    const look = weatherLook(d.code);
+    // Debajo del 20% la probabilidad no cambia ninguna decisión y sólo agrega
+    // ruido a una tira de siete columnas.
+    const pop = d.pop >= 20 ? `${icon('drizzle', 12)} ${d.pop}%` : '';
+    return `<div class="dash-weather-day${i === 0 ? ' today' : ''}">
+      <div class="dash-weather-name">${escapeHtml(weatherDayLabel(d.dateISO, i))}</div>
+      <div class="dash-weather-icon">${icon(look.icon, 28)}</div>
+      <div class="dash-weather-label">${escapeHtml(look.label)}</div>
+      <div class="dash-weather-temps">
+        <span class="dash-weather-max">${d.max}°</span>
+        <span class="dash-weather-min">${d.min}°</span>
+      </div>
+      <div class="dash-weather-pop">${pop}</div>
+    </div>`;
+  }).join('');
+}
+
+function buildWeatherSkeleton() {
+  const cell = `<div class="dash-weather-day skeleton">
+    <div class="dash-weather-bone name"></div>
+    <div class="dash-weather-bone dot"></div>
+    <div class="dash-weather-bone line"></div>
+  </div>`;
+  return cell.repeat(WEATHER_DAYS);
+}
+
+function renderWeatherWidget() {
+  const c = weatherState.current;
+  const sub = c
+    ? `Ahora ${c.temp}° · ${escapeHtml(weatherLook(c.code).label)}`
+    : 'Pronóstico para los próximos 7 días';
+
+  let body;
+  if (weatherState.status === 'error') {
+    body = `<div class="dash-empty">No se pudo cargar el clima.
+      <div class="controls" style="margin-top:12px;">
+        <button type="button" class="secondary dash-link-btn" id="weatherRetry">Reintentar</button>
+      </div>
+    </div>`;
+  } else {
+    body = `<div class="dash-weather-strip">${weatherState.days.length ? buildWeatherStrip() : buildWeatherSkeleton()}</div>`;
+  }
+
+  return `<div class="dash-widget-title">Clima en San Isidro</div>
+    <div class="dash-widget-sub">${sub}</div>
+    ${body}`;
+}
+
+function wireWeatherModule(el) {
+  const retry = el.querySelector('#weatherRetry');
+  if (retry) retry.onclick = () => retryWeather(repaintWeatherModule);
+}
+
+// Se reemplaza sólo esta tarjeta y no se llama a renderAll(): un render entero
+// disparado desde una respuesta que llega en cualquier momento cortaría un
+// arrastre en curso y le sacaría el foco a quien esté usando la pantalla.
+function repaintWeatherModule() {
+  if (view !== 'menu' || dashboardEditing) return;
+  const card = appEl.querySelector('#bento-widget-clima .dash-widget');
+  if (!card) return;
+  card.innerHTML = renderWeatherWidget();
+  wireWeatherModule(card);
+}
+
 /* ---------- Módulos del dashboard ----------
    Cada módulo se declara una sola vez: cuánto ocupa en la grilla de 12
    columnas, cómo se dibuja y cómo se conecta. El orden en que se muestran lo
@@ -272,6 +349,17 @@ const DASH_MODULES = {
           <div class="dash-split-legend-item"><span class="dash-split-dot card"></span>Tarjeta — $ ${fmt(s.cardThisMonth)}</div>
         </div>` : `<div class="dash-empty">Todavía no hay ventas este mes.</div>`}
     </div>`,
+  },
+
+  'widget-clima': {
+    span: 12,
+    label: 'Clima en San Isidro',
+    // No mira las estadísticas: es el único módulo cuyo dato no sale de db.
+    render: () => `<div class="dash-widget">${renderWeatherWidget()}</div>`,
+    wire: (el) => {
+      wireWeatherModule(el);
+      ensureWeather(repaintWeatherModule);
+    },
   },
 
   'widget-recent': {
