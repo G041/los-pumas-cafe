@@ -60,8 +60,11 @@ function computeDashboardStats() {
   };
 }
 
-function buildSalesTrendChart(trend) {
-  const w = 640, h = 220, padL = 46, padR = 10, padT = 14, padB = 26;
+// Recibe el tamaño real del contenedor en píxeles y lo usa tal cual como
+// viewBox: así el gráfico llena el alto que le hayan dado al módulo sin
+// deformar ni el texto ni el grosor de la línea.
+function buildSalesTrendChart(trend, w, h) {
+  const padL = 46, padR = 10, padT = 14, padB = 26;
   const innerW = w - padL - padR, innerH = h - padT - padB;
   const n = trend.length;
   const values = trend.map(r => r.s3);
@@ -80,13 +83,13 @@ function buildSalesTrendChart(trend) {
     const y = padT + innerH * (1 - f);
     const val = Math.round(maxVal * f);
     return `<line x1="${padL}" x2="${w - padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--card-border)" stroke-width="1" stroke-dasharray="3,4"/>
-      <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--muted)">${fmt(val)}</text>`;
+      <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="var(--muted)">${fmt(val)}</text>`;
   }).join('');
 
   const labelIdxs = [...new Set(n > 1 ? [0, Math.floor((n - 1) / 2), n - 1] : [0])];
   const xLabels = labelIdxs.map(i => {
     const p = points[i];
-    return `<text x="${p.x.toFixed(1)}" y="${h - 6}" font-size="10" text-anchor="middle" fill="var(--muted)">${toDisplayDate(trend[i].dateISO).slice(0, 5)}</text>`;
+    return `<text x="${p.x.toFixed(1)}" y="${h - 6}" font-size="11" text-anchor="middle" fill="var(--muted)">${toDisplayDate(trend[i].dateISO).slice(0, 5)}</text>`;
   }).join('');
 
   const html = `
@@ -106,6 +109,39 @@ function buildSalesTrendChart(trend) {
       ${xLabels}
     </svg>`;
   return { html, points, w, h };
+}
+
+/* El gráfico ya no tiene un tamaño fijo: se redibuja con las medidas reales de
+   su caja cada vez que cambian, sea porque se redimensionó el módulo o porque
+   cambió el ancho de la ventana. */
+let salesChartObserver = null;
+
+function observeSalesChart(wrap, trend) {
+  wrap._trend = trend;
+  // El dibujo inicial va acá y no se delega al observer: leer clientWidth ya
+  // fuerza el cálculo del layout, así que la medida está disponible, y así el
+  // gráfico no depende de que el observer llegue a dispararse.
+  drawSalesChart(wrap);
+  if (typeof ResizeObserver === 'undefined') return;
+  if (!salesChartObserver) {
+    salesChartObserver = new ResizeObserver(entries => entries.forEach(en => drawSalesChart(en.target)));
+  }
+  salesChartObserver.observe(wrap);
+}
+
+function drawSalesChart(wrap) {
+  const trend = wrap._trend;
+  if (!trend || !trend.length || !wrap.isConnected) return;
+  const w = Math.round(wrap.clientWidth);
+  const h = Math.round(wrap.clientHeight);
+  if (w < 80 || h < 60) return;
+  if (wrap._w === w && wrap._h === h) return; // el arrastre dispara muchas veces por celda
+  wrap._w = w;
+  wrap._h = h;
+  const chart = buildSalesTrendChart(trend, w, h);
+  wrap.innerHTML = chart.html + `<div class="dash-tooltip"><div class="tt-date"></div><div class="tt-val"></div></div>`;
+  // En modo edición la tarjeta es un objeto que se agarra, no una que se usa.
+  if (!dashboardEditing) wireTrendChartHover(wrap, chart);
 }
 
 function wireTrendChartHover(wrapEl, chart) {
@@ -215,7 +251,9 @@ function wireWeatherModule(el) {
 // disparado desde una respuesta que llega en cualquier momento cortaría un
 // arrastre en curso y le sacaría el foco a quien esté usando la pantalla.
 function repaintWeatherModule() {
-  if (view !== 'menu' || dashboardEditing) return;
+  if (view !== 'menu') return;
+  // Los tiradores son hermanos de la tarjeta, no hijos, así que reemplazarla no
+  // los toca: se puede repintar también mientras se acomoda el panel.
   const card = appEl.querySelector('#bento-widget-clima .dash-widget');
   if (!card) return;
   card.innerHTML = renderWeatherWidget();
@@ -223,12 +261,15 @@ function repaintWeatherModule() {
 }
 
 /* ---------- Módulos del dashboard ----------
-   Cada módulo se declara una sola vez: cuánto ocupa en la grilla de 12
-   columnas, cómo se dibuja y cómo se conecta. El orden en que se muestran lo
-   decide dashboardOrder, no este objeto. */
+   Cada módulo se declara una sola vez: cómo se dibuja, cómo se conecta y si se
+   puede estirar. Dónde va y cuánto mide lo decide dashboardLayout, no este
+   objeto; acá sólo viven los límites de hasta dónde se lo puede achicar, que
+   son los que evitan que quede ilegible.
+
+   Los cuatro indicadores de arriba y los accesos rápidos no se redimensionan:
+   su contenido es de tamaño fijo y estirarlos sólo agregaría aire. */
 const DASH_MODULES = {
   'kpi-ventas': {
-    span: 3,
     label: 'Ventas del mes',
     render: (s) => {
       const trendIcon = s.momPct > 0 ? 'arrowUp' : (s.momPct < 0 ? 'arrowDown' : 'minus');
@@ -244,7 +285,6 @@ const DASH_MODULES = {
   },
 
   'kpi-ticket': {
-    span: 3,
     label: 'Ticket promedio por plato',
     render: (s) => `<div class="dash-kpi">
       <div class="dash-kpi-label">Ticket promedio por plato</div>
@@ -254,7 +294,6 @@ const DASH_MODULES = {
   },
 
   'kpi-platos': {
-    span: 3,
     label: 'Platos vendidos',
     render: (s) => `<div class="dash-kpi">
       <div class="dash-kpi-label">Platos vendidos</div>
@@ -264,7 +303,6 @@ const DASH_MODULES = {
   },
 
   'kpi-fiscal': {
-    span: 3,
     label: 'Total fiscal del mes',
     render: (s) => `<div class="dash-kpi">
       <div class="dash-kpi-label">Total fiscal del mes</div>
@@ -274,28 +312,24 @@ const DASH_MODULES = {
   },
 
   'widget-sales': {
-    span: 8,
     label: 'Resumen de ventas',
-    render: (s) => {
-      const chart = s.trend.length ? buildSalesTrendChart(s.trend) : null;
-      return `<div class="dash-widget">
-        <div class="dash-widget-title">Resumen de ventas</div>
-        <div class="dash-widget-sub">Últimos ${s.trend.length} días con cierre cargado</div>
-        ${chart
-          ? `<div class="dash-chart-wrap">${chart.html}<div class="dash-tooltip"><div class="tt-date"></div><div class="tt-val"></div></div></div>`
-          : `<div class="dash-empty">Todavía no hay suficientes datos para el gráfico.</div>`}
-      </div>`;
-    },
+    resizable: true, minW: 4, minH: 4,
+    // El SVG no sale de acá: hasta que no esté en el documento no se sabe qué
+    // tamaño tiene la caja, y ese tamaño es justamente el que lo define.
+    render: (s) => `<div class="dash-widget">
+      <div class="dash-widget-title">Resumen de ventas</div>
+      <div class="dash-widget-sub">Últimos ${s.trend.length} días con cierre cargado</div>
+      ${s.trend.length
+        ? `<div class="dash-chart-wrap"></div>`
+        : `<div class="dash-empty">Todavía no hay suficientes datos para el gráfico.</div>`}
+    </div>`,
     wire: (el, s) => {
       const wrap = el.querySelector('.dash-chart-wrap');
-      // Mismo cálculo que en render: puro y determinístico, así que los puntos
-      // coinciden con los que se dibujaron.
-      if (wrap && s.trend.length) wireTrendChartHover(wrap, buildSalesTrendChart(s.trend));
+      if (wrap && s.trend.length) observeSalesChart(wrap, s.trend);
     },
   },
 
   'widget-actions': {
-    span: 4,
     label: 'Accesos rápidos',
     render: () => `<div class="dash-widget">
       <div class="dash-widget-title">Accesos rápidos</div>
@@ -309,8 +343,8 @@ const DASH_MODULES = {
   },
 
   'widget-weekday': {
-    span: 6,
     label: 'Mejor día de la semana',
+    resizable: true, minW: 4, minH: 4,
     render: (s) => {
       const bars = s.hasWeekdayData ? (() => {
         const maxAvg = Math.max(...s.weekdayAvg, 1);
@@ -334,11 +368,14 @@ const DASH_MODULES = {
   },
 
   'widget-split': {
-    span: 6,
     label: 'Efectivo vs Tarjeta',
+    resizable: true, minW: 3, minH: 3,
+    // El contenido es corto y de alto fijo: si al módulo le sobra alto, se
+    // centra en vez de quedar pegado arriba con un vacío abajo.
     render: (s) => `<div class="dash-widget">
       <div class="dash-widget-title">Efectivo vs Tarjeta</div>
       <div class="dash-widget-sub">Este mes</div>
+      <div class="dash-widget-body centered">
       ${s.ccTotal > 0 ? `
         <div class="dash-split-bar">
           <div class="dash-split-seg cash" style="flex:${s.cashPct};">${s.cashPct >= 12 ? s.cashPct + '%' : ''}</div>
@@ -348,12 +385,13 @@ const DASH_MODULES = {
           <div class="dash-split-legend-item"><span class="dash-split-dot cash"></span>Efectivo — $ ${fmt(s.cashThisMonth)}</div>
           <div class="dash-split-legend-item"><span class="dash-split-dot card"></span>Tarjeta — $ ${fmt(s.cardThisMonth)}</div>
         </div>` : `<div class="dash-empty">Todavía no hay ventas este mes.</div>`}
+      </div>
     </div>`,
   },
 
   'widget-clima': {
-    span: 12,
     label: 'Clima en San Isidro',
+    resizable: true, minW: 3, minH: 4,
     // No mira las estadísticas: es el único módulo cuyo dato no sale de db.
     render: () => `<div class="dash-widget">${renderWeatherWidget()}</div>`,
     wire: (el) => {
@@ -363,8 +401,8 @@ const DASH_MODULES = {
   },
 
   'widget-recent': {
-    span: 12,
     label: 'Últimos cierres',
+    resizable: true, minW: 5, minH: 4,
     render: (s) => {
       const rows = s.recent.map(r => `
         <tr>
@@ -373,12 +411,16 @@ const DASH_MODULES = {
           <td class="${r.final >= 0 ? 'result-pos' : 'result-neg'}">$ ${fmt(r.final)}</td>
           <td>${r.platos}</td>
         </tr>`).join('');
+      // Si el módulo queda más bajo que la tabla, la tabla se scrollea sola en
+      // vez de desbordar la tarjeta.
       return `<div class="dash-widget">
         <div class="dash-widget-title">Últimos cierres</div>
-        <table class="dash-recent">
-          <thead><tr><th>Fecha</th><th>Ventas</th><th>Resultado</th><th>Platos</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
+        <div class="dash-widget-body scrolls">
+          <table class="dash-recent">
+            <thead><tr><th>Fecha</th><th>Ventas</th><th>Resultado</th><th>Platos</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
         <div class="controls" style="margin-top:12px;">
           <button type="button" class="secondary dash-link-btn" id="goFacturacionFromRecent">Ver facturación completa ${icon('arrowRight', 16)}</button>
         </div>
@@ -419,16 +461,24 @@ function renderMenu() {
 
   const s = computeDashboardStats();
   const todayRecord = db.find(r => r.dateISO === isoToday());
-  const total = dashboardOrder.length;
 
-  const itemsHtml = dashboardOrder.map((id, i) => {
+  // El DOM sale en orden de lectura (arriba-abajo, izquierda-derecha) aunque la
+  // grilla los ubique por coordenadas: de eso dependen el orden de tabulación y
+  // el apilado en pantallas chicas.
+  const ids = layoutReadingOrder();
+  const rows = layoutBottom(dashboardLayout) + (dashboardEditing ? GRID_SPARE_ROWS : 0);
+
+  const itemsHtml = ids.map(id => {
     const mod = DASH_MODULES[id];
     const editAttrs = dashboardEditing
-      ? ` tabindex="0" role="group" aria-roledescription="Módulo reordenable" aria-label="${escapeHtml(mod.label)}, posición ${i + 1} de ${total}"`
+      ? ` tabindex="0" role="group" aria-roledescription="Módulo del panel" aria-label="${escapeHtml(bentoAriaLabel(id))}"`
       : '';
-    return `<div class="bento-item bento-span-${mod.span}" id="bento-${id}" data-module="${id}"${editAttrs}>
+    const handles = dashboardEditing
+      ? `<span class="bento-grip">${icon('grip', 16)}</span>${mod.resizable ? bentoHandlesHtml() : ''}`
+      : '';
+    return `<div class="bento-item${mod.resizable ? ' resizable' : ''}" id="bento-${id}" data-module="${id}" style="${bentoBoxStyle(dashboardLayout[id])}"${editAttrs}>
       ${mod.render(s)}
-      ${dashboardEditing ? `<span class="bento-grip">${icon('grip', 16)}</span>` : ''}
+      ${handles}
     </div>`;
   }).join('');
 
@@ -444,16 +494,17 @@ function renderMenu() {
           ? `<div class="dash-hero-status ok">${icon('check', 17)} Cierre de hoy cargado — $ ${fmt(todayRecord.s3)}</div>`
           : `<div class="dash-hero-status pending">Todavía no cargaste el cierre de hoy <button type="button" id="heroGoCierre">Cargar cierre</button></div>`)}
         <div class="dash-hero-actions">
+          ${dashboardEditing ? `<button type="button" class="secondary dash-edit-btn" id="dashResetBtn">${icon('undo')} Restaurar</button>` : ''}
           ${dashboardEditing ? `<button type="button" class="secondary dash-edit-btn" id="dashCancelBtn">Cancelar</button>` : ''}
           <button type="button" class="dash-edit-btn ${dashboardEditing ? '' : 'secondary'}" id="dashEditBtn">
-            ${dashboardEditing ? `${icon('check')} Guardar orden` : `${icon('pencil')} Personalizar`}
+            ${dashboardEditing ? `${icon('check')} Guardar panel` : `${icon('pencil')} Personalizar`}
           </button>
         </div>
       </div>
 
-      ${dashboardEditing ? `<p class="dash-edit-hint">Arrastrá los módulos para acomodarlos a tu gusto. Con teclado: elegí uno con Tab y movelo con Ctrl y las flechas.</p>` : ''}
+      ${dashboardEditing ? `<p class="dash-edit-hint">Arrastrá los módulos para moverlos y tirá de los bordes para agrandarlos o achicarlos. Con teclado: elegí uno con Tab, movelo con Ctrl y las flechas, y cambiale el tamaño con Ctrl, Shift y las flechas.</p>` : ''}
 
-      <div class="bento-grid ${dashboardEditing ? 'editing' : ''}">${itemsHtml}</div>
+      <div class="bento-grid ${dashboardEditing ? 'editing' : ''}" style="grid-template-rows: repeat(${Math.max(rows, 1)}, ${GRID_ROW_PX}px);">${itemsHtml}</div>
     </div>`;
 
   wireDashboardActions();
@@ -465,24 +516,33 @@ function renderMenu() {
 
   appEl.querySelector('#dashEditBtn').onclick = () => {
     if (dashboardEditing) {
-      saveDashboardOrder();
+      saveDashboardLayout();
       dashboardEditing = false;
-      dashboardOrderBackup = null;
-      announce('Orden del panel guardado.');
+      dashboardLayoutBackup = null;
+      announce('Panel guardado.');
     } else {
-      dashboardOrderBackup = dashboardOrder.slice();
+      dashboardLayoutBackup = cloneLayout(dashboardLayout);
       dashboardEditing = true;
-      announce('Modo personalizar activado. Arrastrá los módulos para reordenarlos.');
+      announce('Modo personalizar activado. Arrastrá los módulos para moverlos o tirá de sus bordes para cambiarles el tamaño.');
     }
     renderAll();
   };
 
   const cancelBtn = appEl.querySelector('#dashCancelBtn');
   if (cancelBtn) cancelBtn.onclick = () => {
-    if (dashboardOrderBackup) dashboardOrder = dashboardOrderBackup;
-    dashboardOrderBackup = null;
+    if (dashboardLayoutBackup) dashboardLayout = dashboardLayoutBackup;
+    dashboardLayoutBackup = null;
     dashboardEditing = false;
     announce('Cambios descartados.');
+    renderAll();
+  };
+
+  const resetBtn = appEl.querySelector('#dashResetBtn');
+  if (resetBtn) resetBtn.onclick = () => {
+    // No guarda solo: sigue siendo un cambio de la sesión de edición, así que
+    // Cancelar todavía puede deshacerlo.
+    dashboardLayout = cloneLayout(DASHBOARD_LAYOUT_DEFAULT);
+    announce('Panel restaurado a su distribución original.');
     renderAll();
   };
 
@@ -493,20 +553,21 @@ function renderMenu() {
     grid.querySelectorAll('button').forEach(b => { b.disabled = true; });
     grid.addEventListener('pointerdown', onBentoPointerDown);
     grid.addEventListener('keydown', onBentoKeyDown);
-  } else {
-    dashboardOrder.forEach(id => {
-      const mod = DASH_MODULES[id];
-      if (mod.wire) mod.wire(appEl.querySelector('#bento-' + id), s);
-    });
   }
+  // Se conectan en los dos modos: el gráfico necesita medirse para dibujarse, y
+  // sin eso el módulo de ventas quedaría vacío mientras se lo acomoda.
+  ids.forEach(id => {
+    const mod = DASH_MODULES[id];
+    if (mod.wire) mod.wire(appEl.querySelector('#bento-' + id), s);
+  });
 }
 
-// Salir del panel sin guardar equivale a cancelar: el orden vuelve al último
-// guardado en vez de quedar a medio camino.
+// Salir del panel sin guardar equivale a cancelar: la distribución vuelve a la
+// última guardada en vez de quedar a medio camino.
 function exitDashboardEditing() {
   if (!dashboardEditing) return;
-  if (dashboardOrderBackup) dashboardOrder = dashboardOrderBackup;
-  dashboardOrderBackup = null;
+  if (dashboardLayoutBackup) dashboardLayout = dashboardLayoutBackup;
+  dashboardLayoutBackup = null;
   dashboardEditing = false;
 }
 
@@ -521,11 +582,16 @@ function wireDashboardActions() {
   if (goPlatos) goPlatos.onclick = () => { view = 'platos'; platoForm = freshPlatoForm(); platosViewState = freshPlatosViewState(); renderAll(); };
 }
 
-/* ---------- Reordenamiento de módulos ----------
-   Lo que sigue al puntero es una copia flotante; el módulo original se queda en
-   la grilla como hueco y es ese hueco el que viaja. Así los vecinos tienen algo
-   que esquivar y se corren de verdad: se mide dónde estaban, se cambia el orden
-   y se anima la diferencia (FLIP), en vez de saltar a la posición nueva. */
+/* ---------- Mover y redimensionar módulos ----------
+   Cada módulo ocupa un rectángulo de celdas y se queda exactamente donde lo
+   dejaron: nadie se corre para tapar un hueco. Eso simplifica las dos
+   operaciones a la misma pregunta — ¿el rectángulo nuevo entra en la grilla y
+   está libre? —, y si la respuesta es no, no se aplica y el módulo se queda
+   donde estaba.
+
+   Mover usa una copia flotante que sigue al puntero mientras el original queda
+   como hueco marcando dónde va a caer. Redimensionar no: ahí la tarjeta cambia
+   de tamaño en vivo, que es justamente lo que se está por decidir. */
 
 const BENTO_FLIP_MS = 300;
 const BENTO_FLIP_EASE = 'cubic-bezier(0.22, 0.61, 0.36, 1)';
@@ -533,9 +599,83 @@ const BENTO_DRAG_START_PX = 4;
 const BENTO_EDGE_PX = 90;      // franja donde el arrastre empieza a scrollear
 const BENTO_EDGE_SPEED = 16;   // px por frame en el borde mismo
 
+const BENTO_HANDLE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+
 let bentoDrag = null;
 
+let bentoResize = null;
+
 function bentoGrid() { return appEl.querySelector('.bento-grid'); }
+
+function bentoHandlesHtml() {
+  return BENTO_HANDLE_DIRS
+    .map(d => `<span class="bento-handle bento-handle-${d}" data-dir="${d}" aria-hidden="true"></span>`)
+    .join('');
+}
+
+function bentoBoxStyle(box) {
+  return `grid-column:${box.x + 1}/span ${box.w};grid-row:${box.y + 1}/span ${box.h};`;
+}
+
+function applyBentoBox(el, box) {
+  el.style.gridColumn = `${box.x + 1}/span ${box.w}`;
+  el.style.gridRow = `${box.y + 1}/span ${box.h}`;
+}
+
+function bentoAriaLabel(id) {
+  const b = dashboardLayout[id];
+  return `${DASH_MODULES[id].label}, columna ${b.x + 1} fila ${b.y + 1}, ${b.w} de ancho por ${b.h} de alto`;
+}
+
+function sizeLimits(id) {
+  const mod = DASH_MODULES[id];
+  return { minW: mod.minW || 1, minH: mod.minH || 1 };
+}
+
+// De arriba a abajo y, dentro de una misma fila, de izquierda a derecha.
+function layoutReadingOrder() {
+  return Object.keys(DASHBOARD_LAYOUT_DEFAULT)
+    .filter(id => dashboardLayout[id] && DASH_MODULES[id])
+    .sort((a, b) => {
+      const A = dashboardLayout[a], B = dashboardLayout[b];
+      return A.y - B.y || A.x - B.x;
+    });
+}
+
+// Un rectángulo sirve si entra en el ancho de la grilla y no pisa a nadie.
+function areaFree(x, y, w, h, exceptId) {
+  if (x < 0 || y < 0 || x + w > GRID_COLS || y + h > GRID_MAX_ROWS) return false;
+  return !Object.keys(dashboardLayout).some(id => {
+    if (id === exceptId) return false;
+    const b = dashboardLayout[id];
+    return x < b.x + b.w && x + w > b.x && y < b.y + b.h && y + h > b.y;
+  });
+}
+
+function gridMetrics(grid) {
+  const cs = getComputedStyle(grid);
+  const rect = grid.getBoundingClientRect();
+  return {
+    rect,
+    colStride: (rect.width + (parseFloat(cs.columnGap) || 0)) / GRID_COLS,
+    rowStride: GRID_ROW_PX + (parseFloat(cs.rowGap) || 0),
+  };
+}
+
+function cellFromPoint(grid, clientX, clientY) {
+  const m = gridMetrics(grid);
+  return {
+    cx: Math.floor((clientX - m.rect.left) / m.colStride),
+    cy: Math.floor((clientY - m.rect.top) / m.rowStride),
+  };
+}
+
+// La grilla tiene que ser más alta que lo ocupado para poder bajar un módulo
+// más allá del último; sin esto no habría celdas donde soltarlo.
+function growGridRows(grid) {
+  const rows = Math.max(layoutBottom(dashboardLayout) + GRID_SPARE_ROWS, 1);
+  grid.style.gridTemplateRows = `repeat(${rows}, ${GRID_ROW_PX}px)`;
+}
 
 // Posiciones visuales (incluyen la animación en curso): son el punto de partida
 // del FLIP, así que un módulo que ya se estaba moviendo sigue desde donde está.
@@ -543,13 +683,6 @@ function captureBentoRects(grid) {
   const map = new Map();
   Array.from(grid.children).forEach(child => map.set(child, child.getBoundingClientRect()));
   return map;
-}
-
-function applyBentoDomOrder(grid) {
-  dashboardOrder.forEach(id => {
-    const child = grid.querySelector('#bento-' + id);
-    if (child) grid.appendChild(child);
-  });
 }
 
 function playBentoFlip(grid, before) {
@@ -573,39 +706,56 @@ function playBentoFlip(grid, before) {
   });
 }
 
-function moveModuleTo(fromIdx, toIdx) {
+// Aplica un rectángulo nuevo si es posible. Devuelve si hubo cambio, para que
+// quien llama sepa si tiene algo que anunciar.
+function setBentoBox(id, next, animate) {
+  const box = dashboardLayout[id];
+  if (next.x === box.x && next.y === box.y && next.w === box.w && next.h === box.h) return false;
+  if (!areaFree(next.x, next.y, next.w, next.h, id)) return false;
   const grid = bentoGrid();
-  if (!grid) return;
-  const before = captureBentoRects(grid);
-  const [id] = dashboardOrder.splice(fromIdx, 1);
-  dashboardOrder.splice(toIdx, 0, id);
-  applyBentoDomOrder(grid);
-  playBentoFlip(grid, before);
+  if (!grid) return false;
+  const el = grid.querySelector('#bento-' + id);
+  const before = animate ? captureBentoRects(grid) : null;
+  Object.assign(box, next);
+  if (el) applyBentoBox(el, box);
+  growGridRows(grid);
+  if (before) playBentoFlip(grid, before);
   refreshBentoLabels(grid);
+  return true;
 }
 
-// El aria-label lleva la posición, así que hay que refrescarlo sin re-renderizar
-// (un render nuevo mataría el arrastre en curso).
+// El aria-label lleva la posición y el tamaño, así que hay que refrescarlo sin
+// re-renderizar (un render nuevo mataría el gesto en curso).
 function refreshBentoLabels(grid) {
-  const total = dashboardOrder.length;
-  dashboardOrder.forEach((id, i) => {
+  Object.keys(dashboardLayout).forEach(id => {
     const el = grid.querySelector('#bento-' + id);
-    if (el) el.setAttribute('aria-label', `${DASH_MODULES[id].label}, posición ${i + 1} de ${total}`);
+    if (el && el.hasAttribute('aria-label')) el.setAttribute('aria-label', bentoAriaLabel(id));
   });
 }
 
 function onBentoPointerDown(e) {
-  if (!dashboardEditing || bentoDrag) return;
+  if (!dashboardEditing || bentoDrag || bentoResize) return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+  // Los tiradores del borde ganan sobre el arrastre: están justo encima de la
+  // tarjeta y agarrarlos siempre quiere decir redimensionar.
+  const handle = e.target.closest('.bento-handle');
+  if (handle) { startBentoResize(e, handle); return; }
+
   const item = e.target.closest('.bento-item');
   if (!item) return;
   const rect = item.getBoundingClientRect();
+  const m = gridMetrics(bentoGrid());
   bentoDrag = {
     pointerId: e.pointerId,
     item,
     id: item.dataset.module,
     startX: e.clientX, startY: e.clientY,
     grabDx: e.clientX - rect.left, grabDy: e.clientY - rect.top,
+    // Con qué celda del módulo se lo agarró: sin esto, arrastrarlo desde el
+    // medio lo mandaría con su esquina superior izquierda bajo el dedo.
+    grabCol: Math.floor((e.clientX - rect.left) / m.colStride),
+    grabRow: Math.floor((e.clientY - rect.top) / m.rowStride),
     width: rect.width, height: rect.height,
     lastX: e.clientX, lastY: e.clientY,
     active: false, raf: 0,
@@ -657,7 +807,7 @@ function bentoEdgeScroll() {
   else if (y > h - BENTO_EDGE_PX) dy = BENTO_EDGE_SPEED * (1 - (h - y) / BENTO_EDGE_PX);
   if (dy) {
     window.scrollBy(0, dy);
-    maybeReorderBento(d.lastX, d.lastY);
+    maybeMoveBento(d.lastX, d.lastY);
   }
   d.raf = requestAnimationFrame(bentoEdgeScroll);
 }
@@ -673,42 +823,24 @@ function onBentoPointerMove(e) {
   }
   e.preventDefault();
   positionBentoDrag();
-  maybeReorderBento(e.clientX, e.clientY);
+  maybeMoveBento(e.clientX, e.clientY);
 }
 
-function maybeReorderBento(clientX, clientY) {
+// La celda de destino es la que está bajo el puntero, corrida por el punto del
+// módulo donde se lo agarró. Si ahí no entra, no se mueve: el hueco se queda
+// donde estaba y se ve que ese lugar está ocupado.
+function maybeMoveBento(clientX, clientY) {
   const d = bentoDrag;
   const grid = bentoGrid();
   if (!d || !grid) return;
-  const gridRect = grid.getBoundingClientRect();
-  const px = clientX - gridRect.left;
-  const py = clientY - gridRect.top;
-
-  // offsetLeft/offsetTop ignoran los transform, así que dan la posición ya
-  // asentada aunque el módulo esté animándose: sin esto, arrastrar rápido
-  // mediría contra posiciones a mitad de camino.
-  let hit = null;
-  Array.from(grid.children).forEach(child => {
-    if (hit || child === d.item) return;
-    const l = child.offsetLeft, t = child.offsetTop;
-    const w = child.offsetWidth, h = child.offsetHeight;
-    if (px >= l && px <= l + w && py >= t && py <= t + h) hit = { child, l, t, w, h };
-  });
-  if (!hit) return;
-
-  // Se compara contra el centro por el eje donde el puntero está más lejos, así
-  // la misma regla sirve para vecinos de al lado y para módulos de otra fila.
-  const dxNorm = (px - (hit.l + hit.w / 2)) / hit.w;
-  const dyNorm = (py - (hit.t + hit.h / 2)) / hit.h;
-  const after = Math.abs(dxNorm) > Math.abs(dyNorm) ? dxNorm > 0 : dyNorm > 0;
-
-  const from = dashboardOrder.indexOf(d.id);
-  const targetIdx = dashboardOrder.indexOf(hit.child.dataset.module);
-  if (from === -1 || targetIdx === -1) return;
-  let to = after ? targetIdx + 1 : targetIdx;
-  if (from < to) to -= 1;
-  if (to === from) return;
-  moveModuleTo(from, to);
+  const box = dashboardLayout[d.id];
+  const cell = cellFromPoint(grid, clientX, clientY);
+  setBentoBox(d.id, {
+    x: clampInt(cell.cx - d.grabCol, 0, GRID_COLS - box.w),
+    y: Math.max(0, cell.cy - d.grabRow),
+    w: box.w,
+    h: box.h,
+  }, true);
 }
 
 function onBentoPointerUp(e) {
@@ -752,24 +884,119 @@ function settleBentoDrag(d) {
   // puede quedarse invisible.
   setTimeout(finish, BENTO_FLIP_MS + 150);
 
-  const idx = dashboardOrder.indexOf(id);
-  announce(`${DASH_MODULES[id].label} quedó en la posición ${idx + 1} de ${dashboardOrder.length}.`);
+  const b = dashboardLayout[id];
+  announce(`${DASH_MODULES[id].label} quedó en la columna ${b.x + 1}, fila ${b.y + 1}.`);
 }
 
+/* ---------- Redimensionar ----------
+   Un mismo gesto para los ocho tiradores: la dirección dice qué bordes se
+   mueven, y los que no se tocan se quedan clavados donde estaban. Por eso se
+   parte siempre del rectángulo que había al empezar y no del anterior — así
+   arrastrar para atrás deshace, en vez de acumular error. */
+
+function startBentoResize(e, handle) {
+  const item = handle.closest('.bento-item');
+  if (!item) return;
+  const id = item.dataset.module;
+  if (!DASH_MODULES[id].resizable) return;
+  bentoResize = {
+    pointerId: e.pointerId,
+    item, id,
+    dir: handle.dataset.dir,
+    start: { ...dashboardLayout[id] },
+  };
+  item.classList.add('resizing');
+  e.preventDefault();
+  window.addEventListener('pointermove', onBentoResizeMove, { passive: false });
+  window.addEventListener('pointerup', onBentoResizeUp);
+  window.addEventListener('pointercancel', onBentoResizeUp);
+}
+
+function onBentoResizeMove(e) {
+  const r = bentoResize;
+  if (!r || e.pointerId !== r.pointerId) return;
+  const grid = bentoGrid();
+  if (!grid) return;
+  e.preventDefault();
+
+  const cell = cellFromPoint(grid, e.clientX, e.clientY);
+  const lim = sizeLimits(r.id);
+  const s = r.start;
+  const next = { ...s };
+
+  if (r.dir.includes('e')) next.w = clampInt(cell.cx - s.x + 1, lim.minW, GRID_COLS - s.x);
+  if (r.dir.includes('w')) {
+    const right = s.x + s.w;
+    next.x = clampInt(cell.cx, 0, right - lim.minW);
+    next.w = right - next.x;
+  }
+  if (r.dir.includes('s')) next.h = clampInt(cell.cy - s.y + 1, lim.minH, GRID_MAX_ROWS - s.y);
+  if (r.dir.includes('n')) {
+    const bottom = s.y + s.h;
+    next.y = clampInt(cell.cy, 0, bottom - lim.minH);
+    next.h = bottom - next.y;
+  }
+
+  setBentoBox(r.id, next, false);
+}
+
+function onBentoResizeUp(e) {
+  const r = bentoResize;
+  if (!r || e.pointerId !== r.pointerId) return;
+  window.removeEventListener('pointermove', onBentoResizeMove);
+  window.removeEventListener('pointerup', onBentoResizeUp);
+  window.removeEventListener('pointercancel', onBentoResizeUp);
+  r.item.classList.remove('resizing');
+  bentoResize = null;
+  // El observer ya redibuja el gráfico mientras se estira, pero al soltar se
+  // fuerza igual: así el tamaño final queda bien aunque el observer no corra.
+  const wrap = r.item.querySelector('.dash-chart-wrap');
+  if (wrap) drawSalesChart(wrap);
+  const b = dashboardLayout[r.id];
+  announce(`${DASH_MODULES[r.id].label} quedó de ${b.w} de ancho por ${b.h} de alto.`);
+}
+
+/* ---------- Teclado ----------
+   Ctrl y las flechas mueven; sumando Shift, cambian el tamaño. Es la única
+   forma de acomodar el panel sin poder arrastrar. */
 function onBentoKeyDown(e) {
   if (!dashboardEditing) return;
   if (!e.ctrlKey && !e.metaKey) return;
-  let delta = 0;
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') delta = -1;
-  else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') delta = 1;
+  let dx = 0, dy = 0;
+  if (e.key === 'ArrowLeft') dx = -1;
+  else if (e.key === 'ArrowRight') dx = 1;
+  else if (e.key === 'ArrowUp') dy = -1;
+  else if (e.key === 'ArrowDown') dy = 1;
   else return;
+
   const item = e.target.closest('.bento-item');
   if (!item) return;
-  const from = dashboardOrder.indexOf(item.dataset.module);
-  const to = from + delta;
-  if (from === -1 || to < 0 || to >= dashboardOrder.length) return;
+  const id = item.dataset.module;
+  const box = dashboardLayout[id];
+  if (!box) return;
+
+  let next;
+  if (e.shiftKey) {
+    if (!DASH_MODULES[id].resizable) return;
+    const lim = sizeLimits(id);
+    next = {
+      x: box.x, y: box.y,
+      w: clampInt(box.w + dx, lim.minW, GRID_COLS - box.x),
+      h: clampInt(box.h + dy, lim.minH, GRID_MAX_ROWS - box.y),
+    };
+  } else {
+    next = {
+      x: clampInt(box.x + dx, 0, GRID_COLS - box.w),
+      y: Math.max(0, box.y + dy),
+      w: box.w, h: box.h,
+    };
+  }
+
   e.preventDefault();
-  moveModuleTo(from, to);
+  if (!setBentoBox(id, next, true)) {
+    announce('No hay lugar para ese movimiento.');
+    return;
+  }
   item.focus();
-  announce(`${DASH_MODULES[item.dataset.module].label}, posición ${to + 1} de ${dashboardOrder.length}.`);
+  announce(bentoAriaLabel(id));
 }
