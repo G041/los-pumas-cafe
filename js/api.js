@@ -1,4 +1,9 @@
-const WORKER_BASE = 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
+// En localhost apunta al worker corrido con `wrangler dev` (KV local, no
+// toca producción) en vez del worker real.
+const IS_LOCAL_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const WORKER_BASE = IS_LOCAL_DEV
+  ? 'http://localhost:8787'
+  : 'https://los-pumas-worker.los-pumas-cafe.workers.dev';
 
 const SESSION_STORAGE_KEY = 'lospumas_session_token';
 

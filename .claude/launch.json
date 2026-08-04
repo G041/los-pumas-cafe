@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "-l", "5500", "."],
       "port": 5500
+    },
+    {
+      "name": "los-pumas-worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "worker", "run", "dev"],
+      "port": 8787
     }
   ]
 }

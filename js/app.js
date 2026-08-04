@@ -233,6 +233,17 @@ async function tryResumeSession() {
 
 document.getElementById('logoutBtn').onclick = logout;
 
-renderAll();
+// En localhost, entra directo con la contraseña de worker/.dev.vars: solo
+// funciona contra un `wrangler dev` local, así que no habilita nada en
+// producción (esa contraseña no existe ahí).
+const DEV_PASSWORD = 'dev-local';
 
-tryResumeSession();
+async function boot() {
+  renderAll();
+  if (IS_LOCAL_DEV && !sessionToken) {
+    try { await login(DEV_PASSWORD, true); } catch (e) {}
+  }
+  tryResumeSession();
+}
+
+boot();
